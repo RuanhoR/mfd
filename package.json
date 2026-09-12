@@ -1,0 +1,74 @@
+{
+  "name": "@mbler/mfd",
+  "version": "0.1.0",
+  "description": "Minecraft addon downloader website & cli (mfd)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RuanhoR/addon-downloader-website.git"
+  },
+  "keywords": [
+    "Minecraft",
+    "addon",
+    "downloader",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@11.10.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./style": {
+      "types": "./dist/style-types.d.mts",
+      "import": "./dist/style-types.mjs"
+    }
+  },
+  "scripts": {
+    "build:frontend": "pnpm -C frontend build",
+    "build:cli": "rolldown -c",
+    "build": "pnpm build:frontend && pnpm build:cli",
+    "dev:frontend": "pnpm -C frontend dev",
+    "cli": "node bin/mfd.js",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "lint:type-check": "tsc --noEmit",
+    "check": "pnpm lint && pnpm test && pnpm lint:type-check && pnpm -C frontend type-check",
+    "format": "prettier ./src --write"
+  },
+  "dependencies": {
+    "cac": "^6.7.14",
+    "rolldown": "^1.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@mbler/mfd": "workspace:*",
+    "@types/node": "^25.0.9",
+    "eslint": "10.4.0",
+    "globals": "17.0.0",
+    "prettier": "3.8.3",
+    "rolldown-plugin-dts": "^0.25.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "8.59.3",
+    "vitest": "^4.1.8"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "frontend/dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org"
+  },
+  "bin": {
+    "mfd": "bin/mfd.js"
+  }
+}
