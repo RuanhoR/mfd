@@ -1,0 +1,9 @@
+{
+  "name": "Demo Addon",
+  "description": "# Demo Addon\n\nA **demo** addon manifest used for local development and testing of `@mbler/mfd`.\n\n## Features\n\n- Markdown introduction rendering\n- Minecraft version selection\n- SAPI (@minecraft/server) version mapping\n\n## Usage\n\n```js\nimport { defineConfig } from '@mbler/mfd'\nexport default defineConfig({\n  mcVersion: { min: '1.21.0', max: '1.21.90' },\n  description: '# Hello',\n})\n```\n\n> Replace this file with your own manifest.addon.json when deploying.\n",
+  "distAddon": "/dist.addon",
+  "mcVersion": {
+    "min": "1.21.0",
+    "max": "1.21.90"
+  }
+}

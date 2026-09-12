@@ -1,0 +1,26 @@
+{
+  "name": "@mbler/mfd-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build:client": "vite build",
+    "build:server": "vite build --ssr src/entry-server.ts",
+    "prerender": "node scripts/prerender.mjs",
+    "build": "pnpm build:client && pnpm build:server && pnpm prerender",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@vue/server-renderer": "^3.5.13",
+    "marked": "^16.0.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.0",
+    "typescript": "^5.9.3",
+    "vite": "npm:rolldown-vite@^7.0.0",
+    "vue-tsc": "^3.0.0"
+  }
+}
