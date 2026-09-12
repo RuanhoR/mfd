@@ -8,6 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { strToU8, zipSync, unzipSync } from 'fflate'
 
 const pkgRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const bin = path.join(pkgRoot, 'bin', 'mfd.js')
@@ -84,6 +85,33 @@ check('default out dir is dist-page', exists(proj2, 'dist-page'))
 check('manifest at default entry', exists(proj2, 'dist-page/manifest.addon.json'))
 check('addon at default entry', read(proj2, 'dist-page/dist.addon').includes('placeholder'))
 check('no style module output', !exists(proj2, 'dist-page/mfd.style.js'))
+
+// 2b) zip addon: served as-is (patching happens in the browser)
+console.log('mfd page (zip addon passthrough)')
+const proj2b = path.join(tmpRoot, 'proj-zip')
+fs.mkdirSync(proj2b, { recursive: true })
+const addonBytes = zipSync({
+  'behavior/manifest.json': strToU8(
+    JSON.stringify({ modules: [{ type: 'data' }] })
+  ),
+  'resources/manifest.json': strToU8(
+    JSON.stringify({ modules: [{ type: 'resources' }] })
+  ),
+})
+fs.writeFileSync(path.join(proj2b, 'dist.mcaddon'), addonBytes)
+fs.writeFileSync(
+  path.join(proj2b, 'mfd.config.js'),
+  `export default {
+  mcVersion: { min: '1.20.0', max: '1.21.90' },
+  description: '# Zip\\n',
+  addon: './dist.mcaddon',
+}
+`
+)
+runCli(['page'], proj2b)
+const outZipBuffer = fs.readFileSync(path.join(proj2b, 'dist-page/dist.addon'))
+check('zip addon copied byte-identical', Buffer.compare(Buffer.from(addonBytes), outZipBuffer) === 0)
+check('zip entries intact', Object.keys(unzipSync(new Uint8Array(outZipBuffer))).sort().join(',') === 'behavior/manifest.json,resources/manifest.json')
 
 // 3) serve honors the config port
 console.log('mfd serve (config port)')

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import type { ManifestAddon } from '../api'
-import { loadSapiEntries, generateServerVersion, compareVersion } from '../sapi'
+import { generateServerVersion, loadSapiEntries, compareVersion } from '../sapi'
+import { patchAddonZip } from '../addonZip'
 import { t } from '../i18n'
 
 const props = defineProps<{
@@ -10,6 +11,7 @@ const props = defineProps<{
 
 const sapiLoading = ref(true)
 const sapiError = ref(false)
+const downloading = ref(false)
 const versions = ref<string[]>([])
 const selected = ref('')
 const serverStable = ref('')
@@ -19,7 +21,7 @@ async function loadVersions(): Promise<void> {
   sapiLoading.value = true
   sapiError.value = false
   try {
-    const entries = await loadSapiEntries()
+    const entries = await loadSapiEntries('@minecraft/server')
     const { min, max } = props.manifest.mcVersion
     versions.value = entries
       .map((e) => e.version)
@@ -43,6 +45,48 @@ watch(selected, async (v) => {
   serverStable.value = await generateServerVersion(v, false).catch(() => '')
   serverBeta.value = await generateServerVersion(v, true).catch(() => '')
 })
+
+function addonFileName(): string {
+  return (
+    props.manifest.distAddon.split(/[?#]/)[0]?.split('/').pop() || 'addon'
+  )
+}
+
+/**
+ * pure-frontend download: fetch the zip, rewrite the behavior-pack
+ * SAPI dependencies for the selected Minecraft version and save the
+ * patched file as a blob — no server support required
+ */
+async function download(): Promise<void> {
+  if (downloading.value || !selected.value) return
+  downloading.value = true
+  try {
+    const res = await fetch(props.manifest.distAddon)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    let data: Uint8Array<ArrayBufferLike> = new Uint8Array(
+      await res.arrayBuffer()
+    )
+    try {
+      data = (
+        await patchAddonZip(data, selected.value, !!props.manifest.isBeta)
+      ).data
+    } catch {
+      // not a zip: download the original payload as-is
+    }
+    const url = URL.createObjectURL(
+      new Blob([data.slice().buffer as ArrayBuffer], {
+        type: 'application/octet-stream',
+      })
+    )
+    const a = document.createElement('a')
+    a.href = url
+    a.download = addonFileName()
+    a.click()
+    URL.revokeObjectURL(url)
+  } finally {
+    downloading.value = false
+  }
+}
 
 onMounted(loadVersions)
 </script>
@@ -88,9 +132,13 @@ onMounted(loadVersions)
           </dd>
         </div>
       </dl>
-      <a class="btn primary" :href="manifest.distAddon" download>
-        {{ t('download') }}
-      </a>
+      <button
+        class="btn primary"
+        :disabled="downloading"
+        @click="download"
+      >
+        {{ downloading ? t('downloading') : t('download') }}
+      </button>
     </template>
     <p v-else class="state">{{ t('noVersions') }}</p>
   </section>

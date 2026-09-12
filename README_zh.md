@@ -110,6 +110,18 @@ manifest api（`manifest.addon.json`）由配置生成，格式如下：
 把整个目录部署到任意静态托管即可；本地预览用 `mfd serve`（会先在临时目录
 跑一次同样的运行时构建）。
 
+## 模组下载重写
+
+下载按钮在**浏览器端**完成 zip 重写——后端只负责文件传递和 `base` 路径，
+因此任意静态托管都能用：
+
+- 页面拉取 addon zip，扫描其中所有 `manifest.json`，对 behavior 包
+  （`modules[0].type === 'data'`）把 `@minecraft/server` /
+  `@minecraft/server-ui` 依赖版本替换为所选 Minecraft 版本 + `isBeta`
+  映射出的 SAPI 版本（与 mbler build 写入 pack manifest 的值一致）；
+- 重写后的 zip 通过 blob 下载保存；非 zip 载荷原样下载；
+- 服务端端点（`mfd page` 产物 / `mfd serve`）始终原样提供 addon 文件。
+
 ## 自定义样式模块
 
 设置 `style: './mfd.style.ts'` 即可自定义页面，方式类似 vitepress。TS 模块会用

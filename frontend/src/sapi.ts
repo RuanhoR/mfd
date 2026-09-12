@@ -1,10 +1,16 @@
 /**
  * Browser port of the sapi logic used by `mbler build`
  * (mcbe/mbler/src/build/sapi.ts): maps a Minecraft version to the
- * matching @minecraft/server version from the npm registry.
+ * matching @minecraft/server(-ui) version from the npm registry.
  */
 const REGISTRY = 'https://registry.npmjs.com'
-const MODULE = '@minecraft/server'
+
+export const SAPI_MODULES = [
+  '@minecraft/server',
+  '@minecraft/server-ui',
+] as const
+
+export type SapiModule = (typeof SAPI_MODULES)[number]
 
 export function compareVersion(a: string, b: string): number {
   const pa = a.split('.').map((x) => parseInt(x, 10) || 0)
@@ -24,7 +30,8 @@ function mcVersionFrom(str: string): string | null {
 
 export interface SapiEntry {
   version: string
-  server: { formal: string; beta: string }
+  formal: string
+  beta: string
 }
 
 async function fetchJson(pathname: string, attempt = 1): Promise<unknown> {
@@ -38,11 +45,25 @@ async function fetchJson(pathname: string, attempt = 1): Promise<unknown> {
   return r.json()
 }
 
-async function fetchEntries(): Promise<SapiEntry[]> {
-  const data = (await fetchJson(`/${MODULE}`)) as {
+const cache = new Map<string, Promise<SapiEntry[]>>()
+
+export function loadSapiEntries(module: SapiModule): Promise<SapiEntry[]> {
+  let p = cache.get(module)
+  if (!p) {
+    p = fetchEntries(module).catch((err) => {
+      cache.delete(module)
+      throw err
+    })
+    cache.set(module, p)
+  }
+  return p
+}
+
+async function fetchEntries(module: SapiModule): Promise<SapiEntry[]> {
+  const data = (await fetchJson(`/${module}`)) as {
     versions?: Record<string, unknown>
   }
-  const map: Record<string, SapiEntry['server']> = {}
+  const map: Record<string, { formal: string; beta: string }> = {}
   for (const v of Object.keys(data.versions ?? {})) {
     const mc = mcVersionFrom(v)
     if (!mc) continue
@@ -54,21 +75,13 @@ async function fetchEntries(): Promise<SapiEntry[]> {
       if (!entry.beta || compareVersion(v, entry.beta) > 0) entry.beta = v
     }
   }
-  const arr = Object.entries(map).map(([version, server]) => ({ version, server }))
+  const arr = Object.entries(map).map(([version, e]) => ({
+    version,
+    formal: e.formal,
+    beta: e.beta,
+  }))
   arr.sort((a, b) => compareVersion(a.version, b.version))
   return arr
-}
-
-let cachePromise: Promise<SapiEntry[]> | null = null
-
-export function loadSapiEntries(): Promise<SapiEntry[]> {
-  if (!cachePromise) {
-    cachePromise = fetchEntries().catch((err) => {
-      cachePromise = null
-      throw err
-    })
-  }
-  return cachePromise
 }
 
 export function evalVersion(result: string): string {
@@ -79,15 +92,16 @@ export function evalVersion(result: string): string {
 }
 
 /**
- * Convert a Minecraft version to the @minecraft/server version,
- * same fallback behavior as mbler build's sapi.
+ * Convert a Minecraft version to the module's SAPI version, same
+ * fallback behavior as mbler build's sapi.
  */
-export async function generateServerVersion(
+export async function generateVersion(
+  module: SapiModule,
   mcVersion: string,
   isBeta = false,
   withFull = false
 ): Promise<string> {
-  const entries = await loadSapiEntries()
+  const entries = await loadSapiEntries(module)
   if (!entries.length) {
     throw new Error('no SAPI version data')
   }
@@ -100,10 +114,19 @@ export async function generateServerVersion(
     }
     entry = candidate ?? entries[0]!
   }
-  let result = isBeta ? entry.server.beta : entry.server.formal
-  if (!result) result = entry.server.formal || entry.server.beta
+  let result = isBeta ? entry.beta : entry.formal
+  if (!result) result = entry.formal || entry.beta
   if (withFull) return result
   result = evalVersion(result || 'error')
   if (!isBeta) result = result.split('-')[0] || result
   return result
+}
+
+/** map the @minecraft/server version (display convenience wrapper) */
+export function generateServerVersion(
+  mcVersion: string,
+  isBeta = false,
+  withFull = false
+): Promise<string> {
+  return generateVersion('@minecraft/server', mcVersion, isBeta, withFull)
 }

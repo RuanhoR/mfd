@@ -95,7 +95,7 @@ describe('generateServerVersion', () => {
       throw new Error('network down')
     })
     const sapi = await loadSapi()
-    await expect(sapi.loadSapiEntries()).rejects.toThrow('network down')
+    await expect(sapi.loadSapiEntries('@minecraft/server')).rejects.toThrow('network down')
 
     stubFetch()
     vi.resetModules()

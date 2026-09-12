@@ -117,6 +117,22 @@ build:
 Deploy the folder to any static host; use `mfd serve` to preview locally
 (it runs the same runtime build into a temp dir first).
 
+## Addon download rewriting
+
+The download button patches the zip **entirely in the browser** — the
+backend only serves files and handles the `base` path, so this works on
+any static host:
+
+- the page fetches the addon zip, scans every `manifest.json` entry and,
+  for the behavior pack(s) (`modules[0].type === 'data'`), rewrites the
+  `@minecraft/server` / `@minecraft/server-ui` dependency versions to
+  the SAPI version mapped from the selected Minecraft version + `isBeta`
+  (same values mbler build writes into pack manifests)
+- the patched zip is then saved via a blob download; non-zip payloads
+  are downloaded as-is
+- the server endpoints (`mfd page` output / `mfd serve`) always serve
+  the addon file unmodified
+
 ## Custom style modules
 
 Set `style: './mfd.style.ts'` to customize the page, vitepress-like. The TS
