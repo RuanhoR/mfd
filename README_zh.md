@@ -74,6 +74,8 @@ POSIX 路径行为一致。
 | `distEntry`           | `string`                                  | 否   | `dist-page`            | `mfd page` 的输出目录；命令行 `--out` 可覆盖 |
 | `addon`               | `string`                                  | 否   | -                      | 构建产物文件路径（`.addon`/`.mcaddon`），复制到 `entryDistAddon` / 在该路径提供 |
 | `port`                | `number`                                  | 否   | `9527`                 | `mfd serve` 的端口                     |
+| `isBeta`              | `boolean`                                 | 否   | `false`                | 使用 beta 版 `@minecraft/server`，与 mbler 的 `script.UseBeta` 一致 |
+| `base`                | `string`                                  | 否   | `/`                    | 类 vite 的 url 基础路径；`mfd page` 构建到 `<distEntry>/<base>`，`mfd serve` 挂在 base 下 |
 | `i18n`                | `Record<string, string \| { zh, en }>`     | 否   | -                      | 按消息 key 覆盖内置界面文案           |
 | `style`               | `string`                                  | 否   | -                      | TS 样式模块路径（见下文）              |
 
@@ -84,22 +86,29 @@ manifest api（`manifest.addon.json`）由配置生成，格式如下：
   "title": { "zh": "我的模组", "en": "My Addon" },
   "description": "# markdown...",
   "distAddon": "/dist.addon",
-  "mcVersion": { "min": "1.21.0", "max": "1.21.90" }
+  "mcVersion": { "min": "1.21.0", "max": "1.21.90" },
+  "isBeta": false
 }
 ```
 
 ## 静态生成（SSG，SEO 优化）
 
-与 vitepress 类似，`mfd page` 生成一个自包含的静态目录：
+与 vitepress 类似，`mfd page` 生成一个自包含的静态目录。包内携带 frontend
+源码作为模板，运行时用 vite（rolldown-vite）**实际构建**，所以配置会真正
+影响构建产物：
 
-- 随包发布的客户端 bundle 复制到输出目录（`distEntry`，默认 `dist-page`）；
-- `index.html`（外加静态托管兜底用的 `404.html`）用 `mfd.config.js` 生成的
-  真实 manifest 服务端渲染，爬虫无需执行 JS 即可拿到实际内容，客户端 bundle
-  再对标记做水合（界面语言随系统语言切换）；
+- `base` 会作为 vite 构建的 base 传入——资源 url 与部署路径一致，页面
+  产物落在 `<distEntry>/<base>`；
+- manifest（由 `mcVersion`/`description`/`title`/`isBeta`/... 生成）、
+  `i18n` 覆盖和（可重定义的）端点路径通过虚拟模块烘焙进 bundle；
+- `index.html`（外加静态托管兜底用的 `404.html`）由真实 manifest 服务端
+  渲染，爬虫无需执行 JS 即可拿到实际内容，客户端 bundle 再做水合
+  （界面语言随系统语言切换）；
 - manifest 写在 `entryAddonManifest`、模组文件写在 `entryDistAddon`、
   打包后的样式模块写在 `/mfd.style.js`。
 
-把整个目录部署到任意静态托管即可；本地预览用 `mfd serve`。
+把整个目录部署到任意静态托管即可；本地预览用 `mfd serve`（会先在临时目录
+跑一次同样的运行时构建）。
 
 ## 自定义样式模块
 

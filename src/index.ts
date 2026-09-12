@@ -10,6 +10,8 @@ export {
   defineConfig,
   resolveLocalized,
   isLocalized,
+  normalizeBase,
+  withBase,
 } from './config'
 export type { MfdConfig, MfdConfigData, MfdMcVersionRange } from './config'
 export {
@@ -23,6 +25,7 @@ export {
 } from './style-types'
 export { buildPage } from './page'
 export { startServeServer } from './server'
+export { prepareFrontend, frontendTemplateDir } from './build-frontend'
 
 function getVersion(): string {
   try {

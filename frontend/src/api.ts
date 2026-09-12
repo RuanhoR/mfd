@@ -1,4 +1,8 @@
-import type { Localized, Locale } from './localized'
+import { entryAddonManifest } from './runtime'
+import type { Localized } from './localized'
+
+export type { Localized }
+export type { MfdBakedConfig } from './runtime'
 
 export interface MfdMcVersionRange {
   min: string
@@ -13,36 +17,15 @@ export interface ManifestAddon {
   description: Localized
   distAddon: string
   mcVersion: MfdMcVersionRange
-}
-
-export interface MfdRuntimeConfig {
-  entryAddonManifest?: string
-  entryStyle?: string | null
-  /** locale the static html was rendered with */
-  locale?: Locale
-  /** ui string overrides from the `i18n` field of mfd.config.js */
-  i18n?: Record<string, Localized>
+  /** use the beta @minecraft/server api (consistent with mbler script.UseBeta) */
+  isBeta?: boolean
 }
 
 declare global {
   interface Window {
-    __MFD_CONFIG__?: MfdRuntimeConfig
-    __MFD_MANIFEST__?: ManifestAddon
+    __MFD_RENDER_LOCALE__?: 'en' | 'zh'
   }
 }
-
-const runtimeConfig: MfdRuntimeConfig | undefined =
-  typeof window !== 'undefined' ? window.__MFD_CONFIG__ : undefined
-
-/** injected by the mfd page server, falls back to defaults in vite dev */
-export const entryAddonManifest: string =
-  runtimeConfig?.entryAddonManifest ?? '/manifest.addon.json'
-
-export const entryStyle: string | null = runtimeConfig?.entryStyle ?? null
-
-/** ui string overrides from the mfd.config.js `i18n` field */
-export const configI18n: Record<string, Localized> | undefined =
-  runtimeConfig?.i18n
 
 export async function fetchManifest(): Promise<ManifestAddon> {
   const res = await fetch(entryAddonManifest)
@@ -50,10 +33,4 @@ export async function fetchManifest(): Promise<ManifestAddon> {
     throw new Error(`HTTP ${res.status} for ${entryAddonManifest}`)
   }
   return (await res.json()) as ManifestAddon
-}
-
-/** hydration state injected by the mfd page server / prerender step */
-export function getClientManifest(): ManifestAddon | null {
-  if (typeof window === 'undefined') return null
-  return window.__MFD_MANIFEST__ ?? null
 }

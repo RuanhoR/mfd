@@ -1,14 +1,11 @@
 import http from 'node:http'
 import path from 'node:path'
 import fsp from 'node:fs/promises'
+import os from 'node:os'
 import type { MfdConfig, MfdLocale } from './config'
-import { STYLE_ENTRY } from './config'
-import {
-  bundleStyle,
-  manifestFromConfig,
-  renderIndexHtml,
-  defaultFrontendDist,
-} from './render'
+import { STYLE_ENTRY, withBase } from './config'
+import { bundleStyle, manifestFromConfig } from './render'
+import { prepareFrontend } from './build-frontend'
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -38,12 +35,9 @@ export interface ServeOptions {
   /** overrides config.port */
   port?: number
   host?: string
-  /** override the frontend dist directory shipped with the package */
+  /** override the frontend template directory */
   root?: string
 }
-
-/** locale -> rendered index.html cache */
-const indexCache = new Map<string, string>()
 
 function pickLocale(acceptLanguage: string | undefined): MfdLocale {
   if (acceptLanguage && acceptLanguage.toLowerCase().includes('zh')) {
@@ -82,16 +76,26 @@ async function serveStatic(
 }
 
 /**
- * `mfd serve`: preview server for development. Serves the client
- * bundle with runtime SSG rendering, the manifest, the addon file
- * and the style module at their (redefinable) entry paths.
+ * `mfd serve`: preview server. Runs the runtime vite build once (into a
+ * temp dir) and serves the result under the configured `base`, with
+ * per-locale ssr index.html, the manifest, the addon file and the
+ * style module at their (redefinable) entry paths.
  * For production, prefer `mfd page` + any static host.
  */
 export async function startServeServer(options: ServeOptions): Promise<void> {
   const config = options.config
-  const root = path.resolve(options.root ?? defaultFrontendDist())
+  const base = config.base
   const port = options.port ?? config.port ?? 9527
   const host = options.host ?? 'localhost'
+
+  console.log('[mfd] building frontend (runtime vite build)...')
+  const cacheDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'mfd-serve-'))
+  const frontend = await prepareFrontend({
+    config,
+    outDir: cacheDir,
+    root: options.root,
+  })
+  const indexCache = new Map<MfdLocale, string>()
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -99,7 +103,18 @@ export async function startServeServer(options: ServeOptions): Promise<void> {
         return send(res, 405, 'method not allowed', 'text/plain; charset=utf-8')
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const pathname = decodeURIComponent(url.pathname)
+      let pathname = decodeURIComponent(url.pathname)
+
+      if (base !== '/') {
+        if (pathname === '/' || pathname === base.replace(/\/+$/, '')) {
+          res.writeHead(302, { Location: base })
+          return res.end()
+        }
+        if (!pathname.startsWith(base)) {
+          return send(res, 404, 'not found (outside base)', 'text/plain; charset=utf-8')
+        }
+        pathname = pathname.slice(base.length - 1)
+      }
 
       if (pathname === config.entryAddonManifest) {
         const manifest = manifestFromConfig(config)
@@ -128,7 +143,7 @@ export async function startServeServer(options: ServeOptions): Promise<void> {
         return send(res, 200, code, 'text/javascript; charset=utf-8')
       }
 
-      const staticFile = await serveStatic(root, pathname)
+      const staticFile = await serveStatic(cacheDir, pathname)
       if (staticFile) {
         return send(res, 200, staticFile.data, staticFile.mime)
       }
@@ -137,7 +152,7 @@ export async function startServeServer(options: ServeOptions): Promise<void> {
       const locale = pickLocale(req.headers['accept-language'])
       let html = indexCache.get(locale)
       if (!html) {
-        html = await renderIndexHtml(root, config, locale)
+        html = await frontend.renderHtml(locale)
         indexCache.set(locale, html)
       }
       send(res, 200, html, 'text/html; charset=utf-8')
@@ -148,16 +163,16 @@ export async function startServeServer(options: ServeOptions): Promise<void> {
   })
 
   await new Promise<void>((resolve) => server.listen(port, host, resolve))
-  const base = `http://${host}:${port}`
-  console.log(`[mfd] page      ${base}`)
-  console.log(`[mfd] manifest  ${base}${config.entryAddonManifest}`)
+  const baseUrl = base === '/' ? '' : base.replace(/\/+$/, '')
+  console.log(`[mfd] page      http://${host}:${port}${baseUrl}/`)
+  console.log(`[mfd] manifest  http://${host}:${port}${withBase(base, config.entryAddonManifest)}`)
   if (config.addon) {
-    console.log(`[mfd] addon     ${base}${config.entryDistAddon} <- ${config.addon}`)
+    console.log(`[mfd] addon     http://${host}:${port}${withBase(base, config.entryDistAddon)} <- ${config.addon}`)
   } else {
-    console.warn(`[mfd] addon     ${base}${config.entryDistAddon} <- missing (no 'addon' in mfd.config.js)`)
+    console.warn(`[mfd] addon     http://${host}:${port}${withBase(base, config.entryDistAddon)} <- missing (no 'addon' in mfd.config.js)`)
   }
   if (config.style) {
-    console.log(`[mfd] style     ${base}${STYLE_ENTRY} <- ${config.style}`)
+    console.log(`[mfd] style     http://${host}:${port}${withBase(base, STYLE_ENTRY)} <- ${config.style}`)
   }
   console.log('[mfd] ctrl+c to stop')
 }

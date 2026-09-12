@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { localeBus } from './events'
+import { getRenderLocale } from './runtime'
 import { resolveLocalized, type Locale, type Localized } from './localized'
-
 const messages: Record<Locale, Record<string, string>> = {
   en: {
     title: 'Addon Downloader',
@@ -14,6 +14,7 @@ const messages: Record<Locale, Record<string, string>> = {
     mcVersion: 'Minecraft version',
     serverApi: '@minecraft/server',
     serverApiBeta: '@minecraft/server (beta)',
+    serverApiStable: '@minecraft/server (stable)',
     download: 'Download .addon',
     loading: 'Loading…',
     sapiFailed: 'Failed to load version data',
@@ -33,6 +34,7 @@ const messages: Record<Locale, Record<string, string>> = {
     mcVersion: 'Minecraft 版本',
     serverApi: '@minecraft/server',
     serverApiBeta: '@minecraft/server（测试版）',
+    serverApiStable: '@minecraft/server（正式版）',
     download: '下载 .addon',
     loading: '加载中…',
     sapiFailed: '版本数据加载失败',
@@ -55,24 +57,25 @@ export function setI18nOverrides(
 }
 
 /**
- * starts as 'en' (or the locale chosen by the mfd page server for the
- * static render, injected via __MFD_CONFIG__) so SSR markup matches
- * the first client render
+ * starts as the locale the static html was rendered with (injected via
+ * __MFD_RENDER_LOCALE__, 'en' for ssr) so the first client render
+ * matches the markup it hydrates
  */
-export const locale = ref<Locale>('en')
+export const locale = ref<Locale>(getRenderLocale() ?? 'en')
 
-/** restore saved locale / browser language after hydration (client only) */
+function detectLocale(): Locale {
+  return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
 /**
- * follow the system language automatically; only a value saved by a
- * custom layout (via setLocale) takes precedence
+ * the ui language follows the system language automatically; only a
+ * value saved by a previous visit / custom layout (via setLocale) wins.
+ * runs after mount, so switching is a reactive update (no hydration
+ * mismatch) even when the static html was rendered in another locale.
  */
 export function initLocale(): void {
   const saved = localStorage.getItem(KEY)
-  if (saved === 'en' || saved === 'zh') {
-    setLocale(saved)
-    return
-  }
-  setLocale(navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en')
+  setLocale(saved === 'en' || saved === 'zh' ? saved : detectLocale())
 }
 
 /**

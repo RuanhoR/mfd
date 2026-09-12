@@ -76,6 +76,8 @@ Display strings accept either a plain `string` (same for every locale) or a
 | `distEntry`           | `string`                                 | no       | `dist-page`            | output directory for `mfd page`; the `--out` cli flag overrides it |
 | `addon`               | `string`                                 | no       | -                      | path to the built addon file (`.addon`/`.mcaddon`), copied to `entryDistAddon` / served there |
 | `port`                | `number`                                 | no       | `9527`                 | port for `mfd serve`                             |
+| `isBeta`              | `boolean`                                | no       | `false`                | use the beta `@minecraft/server` api, consistent with mbler's `script.UseBeta` |
+| `base`                | `string`                                 | no       | `/`                    | url base path like vite's `base`; `mfd page` builds into `<distEntry>/<base>` and `mfd serve` serves under it |
 | `i18n`                | `Record<string, string \| { zh, en }>`    | no       | -                      | override built-in ui strings by message key      |
 | `style`               | `string`                                 | no       | -                      | path to a TS style module (see below)            |
 
@@ -87,25 +89,33 @@ served as:
   "title": { "zh": "我的模组", "en": "My Addon" },
   "description": "# markdown...",
   "distAddon": "/dist.addon",
-  "mcVersion": { "min": "1.21.0", "max": "1.21.90" }
+  "mcVersion": { "min": "1.21.0", "max": "1.21.90" },
+  "isBeta": false
 }
 ```
 
 ## Static generation (SSG, SEO)
 
-Like vitepress, `mfd page` generates a self-contained static folder:
+Like vitepress, `mfd page` generates a self-contained static folder.
+The package ships the frontend source as a template and builds it with
+vite (rolldown-vite) **at runtime**, so your config affects the actual
+build:
 
-- the shipped client bundle is copied to the output directory
-  (`distEntry`, default `dist-page`)
+- `base` is passed to vite as the build base — asset urls match the
+  deployment path and the page lands in `<distEntry>/<base>`
+- the manifest (from `mcVersion`/`description`/`title`/`isBeta`/...),
+  the `i18n` overrides and the (redefinable) entry paths are baked into
+  the bundle via a virtual module
 - `index.html` (+ `404.html` as the static-host fallback) is
-  server-side rendered with the real manifest from `mfd.config.js`, so
-  crawlers get the actual content without executing JS, and the client
-  bundle hydrates that markup afterwards (the ui language then follows
-  the system language)
+  server-side rendered from the real manifest, so crawlers get the
+  actual content without executing JS, and the client bundle hydrates
+  that markup afterwards (the ui language then follows the system
+  language)
 - the manifest is written at `entryAddonManifest`, the addon file at
   `entryDistAddon`, and the bundled style module at `/mfd.style.js`
 
-Deploy the folder to any static host; use `mfd serve` to preview locally.
+Deploy the folder to any static host; use `mfd serve` to preview locally
+(it runs the same runtime build into a temp dir first).
 
 ## Custom style modules
 

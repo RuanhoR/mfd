@@ -12,6 +12,8 @@ export interface MfdManifest {
   description: Localized
   distAddon: string
   mcVersion: { min: string; max: string }
+  /** use the beta @minecraft/server api (consistent with mbler script.UseBeta) */
+  isBeta?: boolean
 }
 
 /**

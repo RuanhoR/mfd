@@ -146,6 +146,35 @@ export default {
     expect(config.distEntry).toBeNull()
     expect(config.addon).toBeNull()
     expect(config.port).toBeNull()
+    expect(config.isBeta).toBe(false)
+    expect(config.base).toBe('/')
+  })
+
+  it('accepts isBeta and normalizes base', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  isBeta: true,
+  base: 'my-addon',
+}
+`,
+    })
+    const config = await readMfdConfig(dir)
+    expect(config.isBeta).toBe(true)
+    expect(config.base).toBe('/my-addon/')
+  })
+
+  it('throws on an invalid isBeta', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  isBeta: 'yes',
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/isBeta/)
   })
 
   it('validates the i18n record', async () => {

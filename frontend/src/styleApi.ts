@@ -1,6 +1,6 @@
 import * as vueRuntime from 'vue'
 import type { Component } from 'vue'
-import { entryStyle } from './api'
+import { entryStyle } from './runtime'
 import { theme, setTheme } from './theme'
 import { locale, setLocale, t as translate } from './i18n'
 import { themeBus, localeBus, manifestBus } from './events'

@@ -69,11 +69,23 @@ onMounted(loadVersions)
       <dl class="mapped">
         <div>
           <dt>{{ t('serverApi') }}</dt>
-          <dd><code>{{ serverStable || '—' }}</code></dd>
+          <dd>
+            <code>{{
+              manifest.isBeta
+                ? serverBeta || '—'
+                : serverStable || '—'
+            }}</code>
+          </dd>
         </div>
         <div>
-          <dt>{{ t('serverApiBeta') }}</dt>
-          <dd><code>{{ serverBeta || '—' }}</code></dd>
+          <dt>{{ manifest.isBeta ? t('serverApiStable') : t('serverApiBeta') }}</dt>
+          <dd>
+            <code>{{
+              manifest.isBeta
+                ? serverStable || '—'
+                : serverBeta || '—'
+            }}</code>
+          </dd>
         </div>
       </dl>
       <a class="btn primary" :href="manifest.distAddon" download>

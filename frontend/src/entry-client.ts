@@ -5,7 +5,7 @@ import './style.css'
 import { initTheme } from './theme'
 import { initLocale, setI18nOverrides } from './i18n'
 import { createStyleApi, loadCustomStyle } from './styleApi'
-import { getClientManifest, configI18n } from './api'
+import { getClientManifest, configI18n } from './runtime'
 
 async function bootstrap(): Promise<void> {
   setI18nOverrides(configI18n)

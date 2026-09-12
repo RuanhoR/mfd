@@ -39,6 +39,30 @@ export interface MfdMcVersionRange {
 }
 
 /**
+ * Normalize a url base path: `''` -> `'/'`, `'my-addon'` -> `'/my-addon/'`.
+ */
+export function normalizeBase(base: unknown): string {
+  if (base === undefined || base === null || base === '') return '/'
+  if (typeof base !== 'string') {
+    throw new Error(`[mfd] base must be a string url path like '/my-addon/'`)
+  }
+  let b = base.trim()
+  if (b === '/') return '/'
+  if (!b.startsWith('/')) b = `/${b}`
+  if (!b.endsWith('/')) b = `${b}/`
+  return b
+}
+
+/**
+ * Prefix an api entry path with the url base. `base === '/'` (the
+ * default) leaves the entry untouched.
+ */
+export function withBase(base: string, entry: string): string {
+  if (base === '/') return entry
+  return base + entry.replace(/^\/+/, '')
+}
+
+/**
  * Raw shape of `mfd.config.js` (before defaults are applied).
  *
  * Always author it through {@link defineConfig} so IDEs can type-check
@@ -116,6 +140,23 @@ export interface MfdConfigData {
    */
   port?: number
   /**
+   * Use the beta `@minecraft/server` api, consistent with mbler's
+   * `script.UseBeta`. The page marks the beta SAPI version as the
+   * primary mapping for each Minecraft version.
+   *
+   * @default false
+   */
+  isBeta?: boolean
+  /**
+   * Url base path the page is deployed under, like vite's `base`.
+   * `mfd page` builds into `<distEntry>/<base>` and `mfd serve`
+   * serves everything under the base path. Leading/trailing slashes
+   * are normalized (`'my-addon'` -> `'/my-addon/'`).
+   *
+   * @default '/'
+   */
+  base?: string
+  /**
    * Overrides for the built-in ui strings. Keys are message keys
    * (`download`, `sectionIntro`, `tagline`, ... — see the README for
    * the full list), values accept a plain `string` or `{ zh, en }`.
@@ -153,6 +194,10 @@ export interface MfdConfig {
   addon: string | null
   /** port for `mfd serve`, or null for default */
   port: number | null
+  /** use the beta @minecraft/server api (default false) */
+  isBeta: boolean
+  /** normalized url base path (default '/') */
+  base: string
   i18n: Record<string, Localized> | null
   style: string | null
 }
@@ -294,6 +339,9 @@ export async function readMfdConfig(cwd: string = process.cwd()): Promise<MfdCon
       throw new Error(`[mfd] '${MFD_CONFIG_FILE}': port must be an integer between 1 and 65535`)
     }
   }
+  if (raw.isBeta !== undefined && typeof raw.isBeta !== 'boolean') {
+    throw new Error(`[mfd] '${MFD_CONFIG_FILE}': isBeta must be a boolean`)
+  }
 
   return {
     title: raw.title ?? null,
@@ -304,6 +352,8 @@ export async function readMfdConfig(cwd: string = process.cwd()): Promise<MfdCon
     distEntry,
     addon,
     port: raw.port !== undefined ? Number(raw.port) : null,
+    isBeta: raw.isBeta ?? false,
+    base: normalizeBase(raw.base),
     i18n,
     style,
   }
