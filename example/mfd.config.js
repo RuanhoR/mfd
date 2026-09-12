@@ -12,8 +12,11 @@ export default defineConfig({
   // api endpoints can be redefined:
   entryAddonManifest: '/api/manifest.addon.json',
   entryDistAddon: '/api/dist.addon',
-  // the built addon file served at entryDistAddon:
-  distEntry: './dist.addon',
+  // page build output directory (mfd page) and the built addon file:
+  distEntry: './dist-page',
+  addon: './dist.addon',
+  // preview server port (mfd serve):
+  port: 9527,
   // override built-in ui strings:
   i18n: {
     download: { zh: '下载模组', en: 'Download addon' },

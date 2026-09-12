@@ -32,54 +32,145 @@ export function isLocalized(value: unknown): value is Localized {
 }
 
 export interface MfdMcVersionRange {
+  /** lowest supported Minecraft version, e.g. `'1.21.0'` */
   min: string
+  /** highest supported Minecraft version, e.g. `'1.21.90'` */
   max: string
 }
 
 /**
  * Raw shape of `mfd.config.js` (before defaults are applied).
- * Use `defineConfig` to get IDE type hints while writing it.
+ *
+ * Always author it through {@link defineConfig} so IDEs can type-check
+ * and autocomplete the object.
  */
 export interface MfdConfigData {
-  /** page/addon title shown in the header and document title */
+  /**
+   * Page/addon title, shown in the page header and used as the document
+   * title. Falls back to the message key `title` ("Addon Downloader")
+   * when omitted.
+   *
+   * Accepts a plain `string` (used for every locale) or a `{ zh, en }`
+   * pair picked by the current ui locale.
+   *
+   * @example
+   * ```js
+   * title: { zh: '起床战争', en: 'Bed Wars' }
+   * ```
+   */
   title?: Localized
-  /** supported Minecraft version range, e.g. { min: '1.21.0', max: '1.21.90' } */
+  /**
+   * Supported Minecraft version range. The page only offers versions
+   * inside this range and maps them to `@minecraft/server` versions
+   * with the same SAPI logic as `mbler build`.
+   */
   mcVersion: MfdMcVersionRange
-  /** addon introduction in markdown, rendered on the page */
+  /**
+   * Addon introduction rendered on the page as markdown (with GFM
+   * tables, code blocks, ...). Required.
+   *
+   * Accepts a plain `string` or a `{ zh, en }` pair. When a locale is
+   * missing the other one is used as fallback.
+   *
+   * @example
+   * ```js
+   * description: { zh: '# 中文介绍', en: '# English intro' }
+   * ```
+   */
   description: Localized
-  /** api path serving manifest.addon.json (default: /manifest.addon.json) */
+  /**
+   * API path that serves the generated `manifest.addon.json`.
+   *
+   * Redefine it when the default path collides with something on your
+   * host. Must start with `/` (a missing one is added).
+   *
+   * @default '/manifest.addon.json'
+   */
   entryAddonManifest?: string
-  /** api path serving the addon file (default: /dist.addon) */
+  /**
+   * API path that serves the addon file (the download link target).
+   *
+   * Must start with `/` (a missing one is added).
+   *
+   * @default '/dist.addon'
+   */
   entryDistAddon?: string
-  /** path to the built addon file (.addon/.mcaddon) served at entryDistAddon */
+  /**
+   * Output directory for the `mfd page` static build. Relative paths
+   * are resolved against the config file's cwd.
+   *
+   * @default 'dist-page'
+   */
   distEntry?: string
-  /** override built-in ui strings, keys are message keys (e.g. download) */
+  /**
+   * Path to the built addon file (`.addon` / `.mcaddon`). It is copied
+   * to {@link MfdConfigData.entryDistAddon} by `mfd page` and served
+   * there by `mfd serve`. Relative paths are resolved against the
+   * config file's cwd.
+   */
+  addon?: string
+  /**
+   * Port for the `mfd serve` preview server.
+   *
+   * @default 9527
+   */
+  port?: number
+  /**
+   * Overrides for the built-in ui strings. Keys are message keys
+   * (`download`, `sectionIntro`, `tagline`, ... — see the README for
+   * the full list), values accept a plain `string` or `{ zh, en }`.
+   *
+   * @example
+   * ```js
+   * i18n: { download: { zh: '下载模组', en: 'Download addon' } }
+   * ```
+   */
   i18n?: Record<string, Localized>
-  /** path to a TS style module used to customize page theme/behavior */
+  /**
+   * Path to a TS style module customizing page theme and behavior
+   * (vitepress-like theming). Relative paths are resolved against the
+   * config file's cwd. See the README "Custom style modules" section
+   * for the API surface.
+   *
+   * @example
+   * ```js
+   * style: './mfd.style.ts'
+   * ```
+   */
   style?: string
 }
 
-/** resolved config with defaults applied and paths absolutized */
+  /** resolved config with defaults applied and paths absolutized */
 export interface MfdConfig {
   title: Localized | null
   mcVersion: MfdMcVersionRange
   description: Localized
   entryAddonManifest: string
   entryDistAddon: string
+  /** output directory for the static page build (absolute, or null for default) */
   distEntry: string | null
+  /** absolute path to the built addon file, or null */
+  addon: string | null
+  /** port for `mfd serve`, or null for default */
+  port: number | null
   i18n: Record<string, Localized> | null
   style: string | null
 }
 
 /**
  * Identity helper for `mfd.config.js` so IDEs can type-check the object.
+ * It just returns the argument unchanged.
  *
+ * @example
  * ```js
  * // mfd.config.js
  * import { defineConfig } from '@mbler/mfd'
  * export default defineConfig({
+ *   title: { zh: '我的模组', en: 'My Addon' },
  *   mcVersion: { min: '1.21.0', max: '1.21.90' },
- *   description: { zh: '# 我的模组', en: '# My addon' },
+ *   description: { zh: '# 中文介绍', en: '# English intro' },
+ *   distEntry: './dist-page',
+ *   addon: './dist.mcaddon',
  * })
  * ```
  */
@@ -179,14 +270,29 @@ export async function readMfdConfig(cwd: string = process.cwd()): Promise<MfdCon
     }
   }
   let distEntry: string | null = null
-  if (typeof raw.distEntry === 'string' && raw.distEntry.trim() !== '') {
+  if (raw.distEntry !== undefined) {
+    if (typeof raw.distEntry !== 'string' || raw.distEntry.trim() === '') {
+      throw new Error(`[mfd] '${MFD_CONFIG_FILE}': distEntry must be a directory path`)
+    }
     const p = raw.distEntry.trim()
     distEntry = path.isAbsolute(p) ? p : path.resolve(cwd, p)
-    if (!fs.existsSync(distEntry)) {
-      throw new Error(`[mfd] distEntry not found: ${distEntry}`)
+  }
+  let addon: string | null = null
+  if (raw.addon !== undefined) {
+    if (typeof raw.addon !== 'string' || raw.addon.trim() === '') {
+      throw new Error(`[mfd] '${MFD_CONFIG_FILE}': addon must be a file path`)
     }
-  } else if (raw.distEntry !== undefined) {
-    throw new Error(`[mfd] '${MFD_CONFIG_FILE}': distEntry must be a file path`)
+    const p = raw.addon.trim()
+    addon = path.isAbsolute(p) ? p : path.resolve(cwd, p)
+    if (!fs.existsSync(addon)) {
+      throw new Error(`[mfd] addon file not found: ${addon}`)
+    }
+  }
+  if (raw.port !== undefined) {
+    const port = Number(raw.port)
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      throw new Error(`[mfd] '${MFD_CONFIG_FILE}': port must be an integer between 1 and 65535`)
+    }
   }
 
   return {
@@ -196,6 +302,8 @@ export async function readMfdConfig(cwd: string = process.cwd()): Promise<MfdCon
     entryAddonManifest: normalizeEntry(raw.entryAddonManifest, DEFAULT_ENTRY_ADDON_MANIFEST),
     entryDistAddon: normalizeEntry(raw.entryDistAddon, DEFAULT_ENTRY_DIST_ADDON),
     distEntry,
+    addon,
+    port: raw.port !== undefined ? Number(raw.port) : null,
     i18n,
     style,
   }

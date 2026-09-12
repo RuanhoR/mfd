@@ -34,21 +34,25 @@ export default defineConfig({
 })
 ```
 
-Then serve the page (put your built `.addon` file at `dist.addon`, or pass
-`--addon path/to/file.addon`):
+Then build the static page (put your built `.addon`/`.mcaddon` file path in
+`addon`):
 
 ```sh
 mfd page
-# open http://localhost:9527
+# -> dist-page/, deploy to any static host
+mfd serve   # optional preview server, http://localhost:9527
 ```
 
 ## CLI
 
 ```
-mfd page      serve the addon downloader website
-  -p, --port <port>    port to listen on (default: 9527)
+mfd page      build the static download page (vitepress-like SSG output)
+  -o, --out <dir>      output directory, overrides distEntry in mfd.config.js
+  --locale <locale>    locale for the static render: en | zh (default: en)
+  --root <dir>         custom frontend dist directory
+mfd serve     preview server for the page, manifest and addon endpoints
+  -p, --port <port>    port, overrides port in mfd.config.js (default: 9527)
   -H, --host <host>    host to bind (default: localhost)
-  --addon <file>       path to the .addon file, relative to cwd (default: dist.addon)
   --root <dir>         custom frontend dist directory
 mfd version   print the version
 mfd help      show help
@@ -69,7 +73,9 @@ Display strings accept either a plain `string` (same for every locale) or a
 | `description`         | `string \| { zh, en }` (markdown)         | yes      | -                      | introduction rendered on the page                |
 | `entryAddonManifest`  | `string`                                 | no       | `/manifest.addon.json` | api path serving the manifest                    |
 | `entryDistAddon`      | `string`                                 | no       | `/dist.addon`          | api path serving the addon file (download)       |
-| `distEntry`           | `string`                                 | no       | `dist.addon`           | path to the built addon file (`.addon`/`.mcaddon`); the `--addon` cli flag overrides it |
+| `distEntry`           | `string`                                 | no       | `dist-page`            | output directory for `mfd page`; the `--out` cli flag overrides it |
+| `addon`               | `string`                                 | no       | -                      | path to the built addon file (`.addon`/`.mcaddon`), copied to `entryDistAddon` / served there |
+| `port`                | `number`                                 | no       | `9527`                 | port for `mfd serve`                             |
 | `i18n`                | `Record<string, string \| { zh, en }>`    | no       | -                      | override built-in ui strings by message key      |
 | `style`               | `string`                                 | no       | -                      | path to a TS style module (see below)            |
 
@@ -87,13 +93,19 @@ served as:
 
 ## Static generation (SSG, SEO)
 
-Like vitepress, the page is server-side rendered to static html:
+Like vitepress, `mfd page` generates a self-contained static folder:
 
-- at build time the shipped `frontend/dist/index.html` is pre-rendered from a
-  demo manifest ([demo manifest.addon.json](frontend/public/manifest.addon.json))
-- at runtime `mfd page` re-renders it with the real manifest from
-  `mfd.config.js`, so crawlers get the actual content without executing JS,
-  and the client bundle hydrates that markup.
+- the shipped client bundle is copied to the output directory
+  (`distEntry`, default `dist-page`)
+- `index.html` (+ `404.html` as the static-host fallback) is
+  server-side rendered with the real manifest from `mfd.config.js`, so
+  crawlers get the actual content without executing JS, and the client
+  bundle hydrates that markup afterwards (the ui language then follows
+  the system language)
+- the manifest is written at `entryAddonManifest`, the addon file at
+  `entryDistAddon`, and the bundled style module at `/mfd.style.js`
+
+Deploy the folder to any static host; use `mfd serve` to preview locally.
 
 ## Custom style modules
 

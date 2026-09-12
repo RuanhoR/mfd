@@ -1,7 +1,9 @@
 // smoke test: builds are expected in dist/ + frontend/dist/
-// starts `mfd page` in ./example and checks all endpoints,
-// then repeats with a default-endpoint config in a temp dir.
-import { spawn } from 'node:child_process'
+// 1) `mfd page` static build in ./example (custom endpoints, style, localized strings)
+// 2) `mfd page` with a default config in a temp dir
+// 3) `mfd serve` honoring the config `port` + endpoints
+// 4) cli version/help
+import { spawn, execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -10,36 +12,9 @@ import { fileURLToPath } from 'node:url'
 const pkgRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const bin = path.join(pkgRoot, 'bin', 'mfd.js')
 const exampleDir = path.join(pkgRoot, 'example')
+const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mfd-smoke-'))
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
-
-function startServer(cwd, args) {
-  const child = spawn(process.execPath, [bin, 'page', ...args], {
-    cwd,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  let output = ''
-  child.stdout.on('data', (d) => (output += d))
-  child.stderr.on('data', (d) => (output += d))
-  child.output = () => output
-  return child
-}
-
-async function waitForServer(base, child, tries = 50) {
-  for (let i = 0; i < tries; i++) {
-    if (child.exitCode !== null) {
-      throw new Error(`server exited early:\n${child.output()}`)
-    }
-    try {
-      const res = await fetch(`${base}/`)
-      if (res.ok) return
-    } catch {
-      /* not ready yet */
-    }
-    await wait(200)
-  }
-  throw new Error(`server did not start:\n${child.output()}`)
-}
 
 let failures = 0
 function check(name, cond, extra = '') {
@@ -51,89 +26,113 @@ function check(name, cond, extra = '') {
   }
 }
 
-async function testInstance(cwd, base, args, endpoints, expectCustom) {
-  const child = startServer(cwd, args)
-  try {
-    await waitForServer(base, child)
-
-    const manifestRes = await fetch(base + endpoints.manifest)
-    const manifest = await manifestRes.json()
-    check(
-      `GET ${endpoints.manifest} -> 200 json`,
-      manifestRes.ok &&
-        manifestRes.headers.get('content-type').includes('application/json')
-    )
-    const description = manifest.description
-    const descText =
-      typeof description === 'string'
-        ? description
-        : (description?.en ?? description?.zh ?? '')
-    check('manifest has description (md)', descText.startsWith('#'))
-    check('manifest has distAddon', typeof manifest.distAddon === 'string')
-    check(
-      'manifest has mcVersion min/max',
-      typeof manifest.mcVersion?.min === 'string' &&
-        typeof manifest.mcVersion?.max === 'string'
-    )
-
-    const addonRes = await fetch(base + endpoints.addon)
-    const addonText = await addonRes.text()
-    check(`GET ${endpoints.addon} -> 200 octet-stream`, addonRes.ok && addonRes.headers.get('content-type').includes('octet-stream'))
-    check('addon payload matches file', addonText.includes('placeholder'))
-
-    const indexRes = await fetch(base + '/')
-    const indexHtml = await indexRes.text()
-    check('GET / -> 200 html', indexRes.ok && indexRes.headers.get('content-type').includes('text/html'))
-    check('index.html is ssr rendered (markdown html present)', indexHtml.includes('<h1>') || indexHtml.includes('<h2>'))
-    check('index.html injects __MFD_CONFIG__', indexHtml.includes('__MFD_CONFIG__'))
-    check('index.html injects __MFD_MANIFEST__', indexHtml.includes('__MFD_MANIFEST__'))
-    check('index.html injects entryAddonManifest', indexHtml.includes(endpoints.manifest))
-    if (expectCustom) {
-      check('custom style module served', (await fetch(base + '/mfd.style.js')).ok)
-    } else {
-      check('no style module -> 404', (await fetch(base + '/mfd.style.js')).status === 404)
-    }
-    check('spa fallback works', (await fetch(base + '/some/deep/route')).ok)
-  } finally {
-    child.kill()
-    await wait(200)
-  }
+function runCli(args, cwd) {
+  return execFileSync(process.execPath, [bin, ...args], { cwd, encoding: 'utf-8' })
 }
 
-// 1) example dir: custom endpoints + style module
-console.log('example config (custom endpoints + style)')
-await testInstance(
-  exampleDir,
-  'http://localhost:9527',
-  ['--port', '9527'],
-  { manifest: '/api/manifest.addon.json', addon: '/api/dist.addon' },
-  true
-)
+function exists(dir, rel) {
+  return fs.existsSync(path.join(dir, rel))
+}
 
-// 2) temp dir: default endpoints, no style
-console.log('default config (temp dir)')
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mfd-smoke-'))
+function read(dir, rel) {
+  return fs.readFileSync(path.join(dir, rel), 'utf-8')
+}
+
+// 1) static build with the example config (custom endpoints + style)
+console.log('mfd page (example: custom endpoints + style + localized)')
+const out1 = path.join(tmpRoot, 'page-example')
+runCli(['page', '--out', out1], exampleDir)
+check('index.html rendered (en title)', read(out1, 'index.html').includes('<h1>Example Addon</h1>'))
+check('index.html is ssr rendered (markdown body)', read(out1, 'index.html').includes('An example project for'))
+check('index.html injects __MFD_CONFIG__', read(out1, 'index.html').includes('__MFD_CONFIG__'))
+check('index.html injects entryAddonManifest', read(out1, 'index.html').includes('/api/manifest.addon.json'))
+check('404.html written', exists(out1, '404.html'))
+check('manifest at custom entry', exists(out1, 'api/manifest.addon.json'))
+const manifest = JSON.parse(read(out1, 'api/manifest.addon.json'))
+check('manifest title localized', manifest.title?.en === 'Example Addon' && manifest.title?.zh === '示例模组')
+check('manifest distAddon', manifest.distAddon === '/api/dist.addon')
+check('addon copied to custom entry', read(out1, 'api/dist.addon').includes('placeholder'))
+check('style module bundled', read(out1, 'mfd.style.js').includes('accent'))
+check('ssr bundle not shipped', !exists(out1, 'server'))
+check('demo manifest not shipped', !exists(out1, 'manifest.addon.json'))
+
+console.log('mfd page --locale zh')
+const out1zh = path.join(tmpRoot, 'page-example-zh')
+runCli(['page', '--out', out1zh, '--locale', 'zh'], exampleDir)
+check('zh render used', read(out1zh, 'index.html').includes('<h1>示例模组</h1>'))
+
+// 2) static build with a default config
+console.log('mfd page (temp dir: defaults)')
+const proj2 = path.join(tmpRoot, 'proj')
+const out2 = path.join(tmpRoot, 'page-default')
+fs.mkdirSync(proj2, { recursive: true })
 fs.writeFileSync(
-  path.join(tmp, 'mfd.config.js'),
-  `export default {\n  mcVersion: { min: '1.20.0', max: '1.21.90' },\n  description: '# Smoke\\n',\n}\n`
+  path.join(proj2, 'mfd.config.js'),
+  `export default {
+  mcVersion: { min: '1.20.0', max: '1.21.90' },
+  description: '# Smoke\\n',
+  addon: './dist.addon',
+}
+`
 )
-fs.writeFileSync(path.join(tmp, 'dist.addon'), 'placeholder .addon payload for the smoke test\n')
-await testInstance(
-  tmp,
-  'http://localhost:9528',
-  ['--port', '9528'],
-  { manifest: '/manifest.addon.json', addon: '/dist.addon' },
-  false
-)
+fs.writeFileSync(path.join(proj2, 'dist.addon'), 'placeholder .addon payload for the smoke test\n')
+runCli(['page'], proj2)
+check('default out dir is dist-page', exists(proj2, 'dist-page'))
+check('manifest at default entry', exists(proj2, 'dist-page/manifest.addon.json'))
+check('addon at default entry', read(proj2, 'dist-page/dist.addon').includes('placeholder'))
+check('no style module output', !exists(proj2, 'dist-page/mfd.style.js'))
 
-// 3) cli commands
-const { execFileSync } = await import('node:child_process')
-const version = execFileSync(process.execPath, [bin, 'version'], { cwd: pkgRoot, encoding: 'utf-8' })
+// 3) serve honors the config port
+console.log('mfd serve (config port)')
+const proj3 = path.join(tmpRoot, 'serve')
+fs.mkdirSync(proj3, { recursive: true })
+fs.writeFileSync(
+  path.join(proj3, 'mfd.config.js'),
+  `export default {
+  mcVersion: { min: '1.20.0', max: '1.21.90' },
+  description: { zh: '# 冒烟', en: '# Smoke' },
+  addon: './dist.addon',
+  port: 9599,
+}
+`
+)
+fs.writeFileSync(path.join(proj3, 'dist.addon'), 'placeholder .addon payload for the smoke test\n')
+const serve = spawn(process.execPath, [bin, 'serve'], { cwd: proj3, stdio: ['ignore', 'pipe', 'pipe'] })
+let serveOut = ''
+serve.stdout.on('data', (d) => (serveOut += d))
+serve.stderr.on('data', (d) => (serveOut += d))
+try {
+  let up = false
+  for (let i = 0; i < 50 && !up; i++) {
+    if (serve.exitCode !== null) throw new Error(`serve exited early:\n${serveOut}`)
+    try {
+      await fetch('http://localhost:9599/')
+      up = true
+    } catch {
+      await wait(200)
+    }
+  }
+  check('serve uses config port 9599', up)
+  const html = await (await fetch('http://localhost:9599/')).text()
+  check('serve ssr render', html.includes('<h1>Smoke</h1>'))
+  check('serve manifest endpoint', (await (await fetch('http://localhost:9599/manifest.addon.json')).json()).distAddon === '/dist.addon')
+  check('serve addon endpoint', (await (await fetch('http://localhost:9599/dist.addon')).text()).includes('placeholder'))
+  const zhHtml = await (
+    await fetch('http://localhost:9599/', { headers: { 'Accept-Language': 'zh-CN' } })
+  ).text()
+  check('serve ssr per Accept-Language', zhHtml.includes('<h1>冒烟</h1>'))
+} finally {
+  serve.kill()
+  await wait(200)
+}
+
+// 4) cli commands
+const version = runCli(['version'], pkgRoot)
 check('mfd version prints', /mfd v\d+\.\d+\.\d+/.test(version.trim()))
-const help = execFileSync(process.execPath, [bin, 'help'], { cwd: pkgRoot, encoding: 'utf-8' })
-check('mfd help lists page', help.includes('page'))
+const help = runCli(['help'], pkgRoot)
+check('mfd help lists page and serve', help.includes('page') && help.includes('serve'))
 
-fs.rmSync(tmp, { recursive: true, force: true })
+fs.rmSync(tmpRoot, { recursive: true, force: true })
 
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`)

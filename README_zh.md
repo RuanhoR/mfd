@@ -33,21 +33,24 @@ export default defineConfig({
 })
 ```
 
-然后启动页面服务（把打包好的 `.addon` 放在 `dist.addon`，或用
-`--addon path/to/file.addon` 指定）：
+然后构建静态页面（把打包好的 `.addon`/`.mcaddon` 文件路径写进 `addon`）：
 
 ```sh
 mfd page
-# 打开 http://localhost:9527
+# -> dist-page/，部署到任意静态托管
+mfd serve   # 可选的预览服务器，http://localhost:9527
 ```
 
 ## 命令
 
 ```
-mfd page      启动模组下载页面服务
-  -p, --port <port>    监听端口（默认 9527）
+mfd page      构建静态下载页面（类 vitepress SSG 产物）
+  -o, --out <dir>      输出目录，覆盖 mfd.config.js 的 distEntry
+  --locale <locale>    静态渲染语言：en | zh（默认 en）
+  --root <dir>         自定义前端 dist 目录
+mfd serve     页面 / manifest / 模组文件的预览服务器
+  -p, --port <port>    端口，覆盖 mfd.config.js 的 port（默认 9527）
   -H, --host <host>    绑定地址（默认 localhost）
-  --addon <file>       .addon 文件路径，相对于 cwd（默认 dist.addon）
   --root <dir>         自定义前端 dist 目录
 mfd version   打印版本号
 mfd help      显示帮助
@@ -68,7 +71,9 @@ POSIX 路径行为一致。
 | `description`         | `string \| { zh, en }`（markdown）         | 是   | -                      | 页面渲染的模组介绍                     |
 | `entryAddonManifest`  | `string`                                  | 否   | `/manifest.addon.json` | 提供 manifest 的 api 路径              |
 | `entryDistAddon`      | `string`                                  | 否   | `/dist.addon`          | 提供模组文件（下载）的 api 路径        |
-| `distEntry`           | `string`                                  | 否   | `dist.addon`           | 构建产物文件路径（`.addon`/`.mcaddon`）；命令行 `--addon` 可覆盖 |
+| `distEntry`           | `string`                                  | 否   | `dist-page`            | `mfd page` 的输出目录；命令行 `--out` 可覆盖 |
+| `addon`               | `string`                                  | 否   | -                      | 构建产物文件路径（`.addon`/`.mcaddon`），复制到 `entryDistAddon` / 在该路径提供 |
+| `port`                | `number`                                  | 否   | `9527`                 | `mfd serve` 的端口                     |
 | `i18n`                | `Record<string, string \| { zh, en }>`     | 否   | -                      | 按消息 key 覆盖内置界面文案           |
 | `style`               | `string`                                  | 否   | -                      | TS 样式模块路径（见下文）              |
 
@@ -85,12 +90,16 @@ manifest api（`manifest.addon.json`）由配置生成，格式如下：
 
 ## 静态生成（SSG，SEO 优化）
 
-与 vitepress 类似，页面通过服务端渲染成静态 HTML：
+与 vitepress 类似，`mfd page` 生成一个自包含的静态目录：
 
-- 构建期：随包发布的 `frontend/dist/index.html` 使用演示 manifest
-  （[frontend/public/manifest.addon.json](frontend/public/manifest.addon.json)）预渲染；
-- 运行期：`mfd page` 用 `mfd.config.js` 生成的真实 manifest 重新渲染，
-  爬虫无需执行 JS 即可拿到实际内容，客户端 bundle 再对标记做水合。
+- 随包发布的客户端 bundle 复制到输出目录（`distEntry`，默认 `dist-page`）；
+- `index.html`（外加静态托管兜底用的 `404.html`）用 `mfd.config.js` 生成的
+  真实 manifest 服务端渲染，爬虫无需执行 JS 即可拿到实际内容，客户端 bundle
+  再对标记做水合（界面语言随系统语言切换）；
+- manifest 写在 `entryAddonManifest`、模组文件写在 `entryDistAddon`、
+  打包后的样式模块写在 `/mfd.style.js`。
+
+把整个目录部署到任意静态托管即可；本地预览用 `mfd serve`。
 
 ## 自定义样式模块
 

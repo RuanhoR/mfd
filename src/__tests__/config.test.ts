@@ -127,27 +127,25 @@ export default {
   title: { zh: '标题', en: 'Title' },
   mcVersion: { min: '1.0.0', max: '2.0.0' },
   description: { zh: '# 中文', en: '# English' },
-  distEntry: './dist.addon',
+  distEntry: './dist-page',
+  addon: './dist.addon',
 }
 `,
     })
     const config = await readMfdConfig(dir)
     expect(config.title).toEqual({ zh: '标题', en: 'Title' })
     expect(config.description).toEqual({ zh: '# 中文', en: '# English' })
-    expect(config.distEntry).toBe(path.resolve(dir, 'dist.addon'))
+    expect(config.distEntry).toBe(path.resolve(dir, 'dist-page'))
+    expect(config.addon).toBe(path.resolve(dir, 'dist.addon'))
     expect(config.i18n).toBeNull()
   })
 
-  it('throws when distEntry does not exist', async () => {
-    const dir = project({
-      [MFD_CONFIG_FILE]: `export default {
-  mcVersion: { min: '1.0.0', max: '2.0.0' },
-  description: 'md',
-  distEntry: './nope.addon',
-}
-`,
-    })
-    await expect(readMfdConfig(dir)).rejects.toThrow(/distEntry not found/)
+  it('leaves distEntry/addon/port unset when omitted', async () => {
+    const dir = project({ [MFD_CONFIG_FILE]: validConfig })
+    const config = await readMfdConfig(dir)
+    expect(config.distEntry).toBeNull()
+    expect(config.addon).toBeNull()
+    expect(config.port).toBeNull()
   })
 
   it('validates the i18n record', async () => {
@@ -175,6 +173,46 @@ export default {
 `,
     })
     await expect(readMfdConfig(dir)).rejects.toThrow(/i18n\.download/)
+  })
+
+  it('resolves addon and port', async () => {
+    const dir = project({
+      'build/addon.mcaddon': 'payload',
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  addon: './build/addon.mcaddon',
+  port: 9527,
+}
+`,
+    })
+    const config = await readMfdConfig(dir)
+    expect(config.addon).toBe(path.resolve(dir, 'build/addon.mcaddon'))
+    expect(config.port).toBe(9527)
+  })
+
+  it('throws when the addon file does not exist', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  addon: './nope.mcaddon',
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/addon file not found/)
+  })
+
+  it('throws on an invalid port', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  port: 99999,
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/port/)
   })
 
   it('throws on a non-localized description', async () => {

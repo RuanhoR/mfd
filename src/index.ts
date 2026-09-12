@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import cac, { type CAC } from 'cac'
 import { readMfdConfig } from './config'
-import { startPageServer } from './server'
+import { buildPage } from './page'
+import { startServeServer } from './server'
 
 export {
   readMfdConfig,
@@ -20,6 +21,8 @@ export {
   type MfdLocale,
   type Localized,
 } from './style-types'
+export { buildPage } from './page'
+export { startServeServer } from './server'
 
 function getVersion(): string {
   try {
@@ -37,7 +40,8 @@ function getVersion(): string {
  * Build the mfd command line app (a CAC instance).
  *
  * Commands:
- * - page      serve the addon downloader website
+ * - page      build the static download page (vitepress-like SSG output)
+ * - serve     preview server for the page, manifest and addon endpoints
  * - version   print the version
  * - help      show help
  */
@@ -45,21 +49,43 @@ export function createCliApp(): CAC {
   const cli = cac('mfd')
 
   cli
-    .command('page', 'Serve the addon downloader website')
-    .option('-p, --port <port>', 'Port to listen on', { default: 9527 })
-    .option('-H, --host <host>', 'Host to bind', { default: 'localhost' })
-    .option('--addon <file>', 'Path to the addon file, overrides distEntry in mfd.config.js')
+    .command('page', 'Build the static download page (SSG output)')
+    .option('-o, --out <dir>', 'Output directory, overrides distEntry in mfd.config.js')
+    .option('--locale <locale>', 'Locale for the static render: en | zh', {
+      default: 'en',
+    })
     .option('--root <dir>', 'Custom frontend dist directory')
     .action(async (opts) => {
       try {
         const cwd = process.cwd()
         const config = await readMfdConfig(cwd)
-        await startPageServer({
+        await buildPage({
           config,
           cwd,
-          port: Number(opts.port) || 9527,
+          out: opts.out,
+          locale: opts.locale === 'zh' ? 'zh' : 'en',
+          root: opts.root,
+        })
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : err)
+        process.exitCode = 1
+      }
+    })
+
+  cli
+    .command('serve', 'Serve the page, manifest and addon endpoints (preview)')
+    .option('-p, --port <port>', 'Port, overrides port in mfd.config.js')
+    .option('-H, --host <host>', 'Host to bind', { default: 'localhost' })
+    .option('--root <dir>', 'Custom frontend dist directory')
+    .action(async (opts) => {
+      try {
+        const cwd = process.cwd()
+        const config = await readMfdConfig(cwd)
+        await startServeServer({
+          config,
+          cwd,
+          port: opts.port !== undefined ? Number(opts.port) : undefined,
           host: opts.host || 'localhost',
-          addon: opts.addon,
           root: opts.root,
         })
       } catch (err) {
