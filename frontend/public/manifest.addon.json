@@ -1,6 +1,9 @@
 {
-  "name": "Demo Addon",
-  "description": "# Demo Addon\n\nA **demo** addon manifest used for local development and testing of `@mbler/mfd`.\n\n## Features\n\n- Markdown introduction rendering\n- Minecraft version selection\n- SAPI (@minecraft/server) version mapping\n\n## Usage\n\n```js\nimport { defineConfig } from '@mbler/mfd'\nexport default defineConfig({\n  mcVersion: { min: '1.21.0', max: '1.21.90' },\n  description: '# Hello',\n})\n```\n\n> Replace this file with your own manifest.addon.json when deploying.\n",
+  "title": { "en": "Demo Addon", "zh": "演示模组" },
+  "description": {
+    "en": "# Demo Addon\n\nA **demo** addon manifest used for local development and testing of `@mbler/mfd`.\n\n## Features\n\n- Markdown introduction rendering\n- Minecraft version selection\n- SAPI (@minecraft/server) version mapping\n\n> Replace this file with your own manifest.addon.json when deploying.\n",
+    "zh": "# 演示模组\n\n一个用于 `@mbler/mfd` 本地开发和测试的**演示** manifest。\n\n## 特性\n\n- Markdown 介绍渲染\n- Minecraft 版本选择\n- SAPI（@minecraft/server）版本映射\n\n> 部署时用你自己的 manifest.addon.json 替换本文件。\n"
+  },
   "distAddon": "/dist.addon",
   "mcVersion": {
     "min": "1.21.0",

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { rolldown } from 'rolldown'
-import type { MfdConfig } from './config'
+import type { MfdConfig, MfdLocale } from './config'
 import { STYLE_ENTRY } from './config'
 
 const MIME: Record<string, string> = {
@@ -34,7 +34,7 @@ export interface PageServerOptions {
   cwd?: string
   port?: number
   host?: string
-  /** path to the .addon file served at entryDistAddon, relative to cwd */
+  /** path to the addon file served at entryDistAddon, overrides config.distEntry */
   addon?: string
   /** override the static frontend dist directory */
   root?: string
@@ -74,24 +74,39 @@ function escapeHtml(s: string): string {
 }
 
 function manifestFromConfig(config: MfdConfig): {
-  description: string
+  title?: MfdConfig['title']
+  description: MfdConfig['description']
   distAddon: string
   mcVersion: { min: string; max: string }
 } {
   return {
+    title: config.title ?? undefined,
     description: config.description,
     distAddon: config.entryDistAddon,
     mcVersion: config.mcVersion,
   }
 }
 
+function pickLocale(acceptLanguage: string | undefined): MfdLocale {
+  if (acceptLanguage && acceptLanguage.toLowerCase().includes('zh')) {
+    return 'zh'
+  }
+  return 'en'
+}
+
 interface PageRenderer {
-  renderPage: (manifest: unknown) => Promise<{ html: string; title: string }>
+  renderPage: (
+    manifest: unknown,
+    options?: { locale?: MfdLocale; i18n?: Record<string, unknown> }
+  ) => Promise<{ html: string; title: string }>
 }
 
 let pageRenderer: PageRenderer | null = null
 let pageRendererTried = false
-let renderedIndex: string | null = null
+/** locale -> rendered static html */
+const renderedIndexCache = new Map<string, string>()
+/** serializes ssr renders (locale is module state in the renderer) */
+let renderQueue: Promise<unknown> = Promise.resolve()
 
 async function loadPageRenderer(root: string): Promise<PageRenderer | null> {
   if (pageRendererTried) return pageRenderer
@@ -113,10 +128,16 @@ async function loadPageRenderer(root: string): Promise<PageRenderer | null> {
 /**
  * vitepress-like SSG at runtime: render the page with the real
  * manifest from mfd.config.js into static html (good for SEO),
- * then the client bundle hydrates it.
+ * then the client bundle hydrates it. Rendered per requested
+ * locale (Accept-Language) and cached.
  */
-async function renderIndexHtml(root: string, config: MfdConfig): Promise<string> {
-  if (renderedIndex) return renderedIndex
+async function renderIndexHtml(
+  root: string,
+  config: MfdConfig,
+  locale: MfdLocale
+): Promise<string> {
+  const cached = renderedIndexCache.get(locale)
+  if (cached) return cached
 
   const templatePath = path.join(root, 'index.template.html')
   let template: string
@@ -129,13 +150,25 @@ async function renderIndexHtml(root: string, config: MfdConfig): Promise<string>
   const runtime = {
     entryAddonManifest: config.entryAddonManifest,
     entryStyle: config.style ? STYLE_ENTRY : null,
+    locale,
+    i18n: config.i18n ?? undefined,
   }
   const manifest = manifestFromConfig(config)
 
   let html = template
   const renderer = await loadPageRenderer(root)
   if (renderer) {
-    const { html: body, title } = await renderer.renderPage(manifest)
+    // queue renders so concurrent requests of different locales
+    // cannot interleave (locale is module state in the renderer)
+    const run = renderQueue.then(async () => {
+      const { html: body, title } = await renderer.renderPage(manifest, {
+        locale,
+        i18n: config.i18n ?? undefined,
+      })
+      return { body, title }
+    })
+    renderQueue = run.catch(() => undefined)
+    const { body, title } = await run
     html = html.replace('<div id="app"></div>', `<div id="app">${body}</div>`)
     if (title) {
       html = html.replace('<title>MFD</title>', `<title>${escapeHtml(title)}</title>`)
@@ -146,7 +179,7 @@ async function renderIndexHtml(root: string, config: MfdConfig): Promise<string>
     ? html.replace('</head>', `${state}</head>`)
     : state + html
 
-  renderedIndex = html
+  renderedIndexCache.set(locale, html)
   return html
 }
 
@@ -182,7 +215,8 @@ async function serveStatic(
 export async function startPageServer(options: PageServerOptions): Promise<void> {
   const cwd = options.cwd ?? process.cwd()
   const root = path.resolve(options.root ?? defaultFrontendDist())
-  const addonFile = path.resolve(cwd, options.addon ?? 'dist.addon')
+  // cli --addon overrides config.distEntry, fallback dist.addon
+  const addonFile = path.resolve(cwd, options.addon ?? config_addon(options))
   const config = options.config
 
   const server = http.createServer(async (req, res) => {
@@ -222,8 +256,9 @@ export async function startPageServer(options: PageServerOptions): Promise<void>
         return send(res, 200, staticFile.data, staticFile.mime)
       }
 
-      // SPA/SSG fallback
-      const html = await renderIndexHtml(root, config)
+      // SPA/SSG fallback, rendered per requested locale
+      const locale = pickLocale(req.headers['accept-language'])
+      const html = await renderIndexHtml(root, config, locale)
       send(res, 200, html, 'text/html; charset=utf-8')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -242,4 +277,8 @@ export async function startPageServer(options: PageServerOptions): Promise<void>
     console.log(`[mfd] style     ${base}${STYLE_ENTRY} <- ${config.style}`)
   }
   console.log('[mfd] ctrl+c to stop')
+}
+
+function config_addon(options: PageServerOptions): string {
+  return options.config.distEntry ?? 'dist.addon'
 }

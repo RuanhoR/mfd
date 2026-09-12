@@ -1,4 +1,4 @@
-import type { MfdThemeMode, MfdLocale, MfdManifest } from './style-types'
+import type { MfdThemeMode, Locale, MfdManifest } from './style-types'
 
 type Cb<T> = (value: T) => void
 
@@ -28,5 +28,5 @@ function createBus<T>(): Bus<T> {
 }
 
 export const themeBus = createBus<MfdThemeMode>()
-export const localeBus = createBus<MfdLocale>()
+export const localeBus = createBus<Locale>()
 export const manifestBus = createBus<MfdManifest>()

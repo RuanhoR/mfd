@@ -1,12 +1,23 @@
+// @ts-check
 import { defineConfig } from '@mbler/mfd'
 
 export default defineConfig({
+  // display strings accept a plain string or a { zh, en } pair
+  title: { zh: '示例模组', en: 'Example Addon' },
   mcVersion: { min: '1.21.0', max: '1.21.90' },
-  description:
-    '# Example Addon\n\nAn example project for `@mbler/mfd`.\n\nRun `npx mfd page` in this folder and open http://localhost:9527.\n',
+  description: {
+    zh: '# 示例模组\n\n`@mbler/mfd` 的示例项目。\n\n在本目录运行 `npx mfd page` 并打开 http://localhost:9527。\n',
+    en: '# Example Addon\n\nAn example project for `@mbler/mfd`.\n\nRun `npx mfd page` in this folder and open http://localhost:9527.\n',
+  },
   // api endpoints can be redefined:
   entryAddonManifest: '/api/manifest.addon.json',
   entryDistAddon: '/api/dist.addon',
-  // custom page theme/behavior:
+  // the built addon file served at entryDistAddon:
+  distEntry: './dist.addon',
+  // override built-in ui strings:
+  i18n: {
+    download: { zh: '下载模组', en: 'Download addon' },
+  },
+  // custom page theme/behavior (vitepress-like layout):
   style: './mfd.style.ts',
 })

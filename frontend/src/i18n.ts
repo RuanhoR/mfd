@@ -1,13 +1,11 @@
 import { ref } from 'vue'
 import { localeBus } from './events'
-
-export type Locale = 'en' | 'zh'
+import { resolveLocalized, type Locale, type Localized } from './localized'
 
 const messages: Record<Locale, Record<string, string>> = {
   en: {
     title: 'Addon Downloader',
     tagline: 'Minecraft Bedrock addon downloads',
-    lang: '中文',
     themeToLight: 'Switch to light mode',
     themeToDark: 'Switch to dark mode',
     sectionIntro: 'Introduction',
@@ -27,7 +25,6 @@ const messages: Record<Locale, Record<string, string>> = {
   zh: {
     title: '模组下载',
     tagline: 'Minecraft 基岩版模组下载',
-    lang: 'English',
     themeToLight: '切换到浅色模式',
     themeToDark: '切换到深色模式',
     sectionIntro: '模组介绍',
@@ -48,21 +45,41 @@ const messages: Record<Locale, Record<string, string>> = {
 
 const KEY = 'mfd.locale'
 
-/** starts as 'en' so SSR markup matches the first client render */
+/** ui string overrides from the `i18n` field of mfd.config.js */
+let overrides: Record<string, Localized> | null = null
+
+export function setI18nOverrides(
+  record: Record<string, Localized> | null | undefined
+): void {
+  overrides = record ?? null
+}
+
+/**
+ * starts as 'en' (or the locale chosen by the mfd page server for the
+ * static render, injected via __MFD_CONFIG__) so SSR markup matches
+ * the first client render
+ */
 export const locale = ref<Locale>('en')
 
 /** restore saved locale / browser language after hydration (client only) */
+/**
+ * follow the system language automatically; only a value saved by a
+ * custom layout (via setLocale) takes precedence
+ */
 export function initLocale(): void {
   const saved = localStorage.getItem(KEY)
-  const l: Locale =
-    saved === 'en' || saved === 'zh'
-      ? saved
-      : navigator.language.toLowerCase().startsWith('zh')
-        ? 'zh'
-        : 'en'
-  setLocale(l)
+  if (saved === 'en' || saved === 'zh') {
+    setLocale(saved)
+    return
+  }
+  setLocale(navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en')
 }
 
+/**
+ * switch the ui language programmatically (e.g. from a custom layout
+ * that provides its own language switcher); the default page does not
+ * expose a switcher and just follows the system language
+ */
 export function setLocale(l: Locale): void {
   locale.value = l
   localStorage.setItem(KEY, l)
@@ -70,10 +87,11 @@ export function setLocale(l: Locale): void {
   localeBus.emit(l)
 }
 
-export function toggleLocale(): void {
-  setLocale(locale.value === 'zh' ? 'en' : 'zh')
-}
-
 export function t(key: string): string {
+  const override = overrides?.[key]
+  if (override !== undefined) {
+    const resolved = resolveLocalized(override, locale.value)
+    if (resolved) return resolved
+  }
   return messages[locale.value][key] ?? messages.en[key] ?? key
 }

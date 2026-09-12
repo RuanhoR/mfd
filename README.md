@@ -5,8 +5,8 @@ Minecraft Bedrock addon downloader website & CLI.
 `mfd` serves a pre-rendered (vitepress-like SSG) download page for your addon:
 a markdown introduction, a Minecraft version selector backed by the same SAPI
 mapping logic as `mbler build` (`mcVersion` -> `@minecraft/server`), and a
-download link for your `.addon` file. The frontend supports dark mode and
-English/Chinese i18n.
+download link for your `.addon` file. The frontend supports dark mode, and
+the ui language (en/zh) follows the system language automatically.
 
 ## Install
 
@@ -59,19 +59,26 @@ mfd help      show help
 Read from `process.cwd()`. Loaded with a dynamic `import()` through
 `pathToFileURL`, so it works the same on Windows and POSIX paths.
 
-| field                 | type                          | required | default                | description                                     |
-| --------------------- | ----------------------------- | -------- | ---------------------- | ----------------------------------------------- |
-| `mcVersion`           | `{ min: string, max: string }` | yes      | -                      | supported Minecraft version range                |
-| `description`         | `string` (markdown)           | yes      | -                      | introduction rendered on the page                |
-| `entryAddonManifest`  | `string`                      | no       | `/manifest.addon.json` | api path serving the manifest                    |
-| `entryDistAddon`      | `string`                      | no       | `/dist.addon`          | api path serving the `.addon` file (download)    |
-| `style`               | `string`                      | no       | -                      | path to a TS style module (see below)            |
+Display strings accept either a plain `string` (same for every locale) or a
+`{ zh: string, en: string }` pair picked by the ui locale.
+
+| field                 | type                                     | required | default                | description                                     |
+| --------------------- | ---------------------------------------- | -------- | ---------------------- | ----------------------------------------------- |
+| `title`               | `string \| { zh, en }`                   | no       | -                      | page/addon title (header + document title)       |
+| `mcVersion`           | `{ min: string, max: string }`            | yes      | -                      | supported Minecraft version range                |
+| `description`         | `string \| { zh, en }` (markdown)         | yes      | -                      | introduction rendered on the page                |
+| `entryAddonManifest`  | `string`                                 | no       | `/manifest.addon.json` | api path serving the manifest                    |
+| `entryDistAddon`      | `string`                                 | no       | `/dist.addon`          | api path serving the addon file (download)       |
+| `distEntry`           | `string`                                 | no       | `dist.addon`           | path to the built addon file (`.addon`/`.mcaddon`); the `--addon` cli flag overrides it |
+| `i18n`                | `Record<string, string \| { zh, en }>`    | no       | -                      | override built-in ui strings by message key      |
+| `style`               | `string`                                 | no       | -                      | path to a TS style module (see below)            |
 
 The manifest api (`manifest.addon.json`) is generated from the config and
 served as:
 
 ```json
 {
+  "title": { "zh": "我的模组", "en": "My Addon" },
   "description": "# markdown...",
   "distAddon": "/dist.addon",
   "mcVersion": { "min": "1.21.0", "max": "1.21.90" }
@@ -90,7 +97,7 @@ Like vitepress, the page is server-side rendered to static html:
 
 ## Custom style modules
 
-Set `style: './mfd.style.ts'` to customize page theme and behavior. The TS
+Set `style: './mfd.style.ts'` to customize the page, vitepress-like. The TS
 module is bundled with rolldown, served at `/mfd.style.js` and loaded by the
 page before mount. Get IDE hints via `defineStyle` from `@mbler/mfd/style`:
 
@@ -104,15 +111,29 @@ export default (api: MfdStyleApi): void => {
   api.onManifest((m) => console.log(m.mcVersion))
   api.onThemeChange((mode) => console.log(mode))
   api.onLocaleChange((locale) => console.log(locale))
-  // full takeover: replace the default page with your own component
-  // api.replaceRoot(api.vue.defineComponent({ ... }))
+  // full takeover: provide your own layout component (receives the api as
+  // a prop) and compose the ready-made building blocks
+  // api.setLayout(api.vue.defineComponent({ ... }))
 }
 ```
 
+Or export a `layout` component directly from the module:
+
+```ts
+import { defineStyle } from '@mbler/mfd/style'
+
+export default defineStyle({
+  theme: { accent: '#8b5cf6' },
+  // vitepress-like custom layout; the ready-made pieces are on api.components
+  layout: (props) => props.api.vue.h('div', 'my page'),
+})
+```
+
 The API surface (`MfdStyleApi`): `root`, `vue` (live vue runtime exports, no
-`vue` import needed), `manifest`, `theme`, `locale`, `setThemeVars`,
+`vue` import needed), `components` (ready-made page pieces: `AddonIntro`,
+`AddonVersions`), `manifest`, `theme`, `locale`, `t`, `setThemeVars`,
 `setTheme`, `onThemeChange`, `setLocale`, `onLocaleChange`, `onManifest`,
-`setTitle`, `replaceRoot`, `registerComponent`.
+`setTitle`, `setLayout` / `replaceRoot`, `registerComponent`.
 
 ## Development
 

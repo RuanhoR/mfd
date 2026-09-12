@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { readMfdConfig, defineConfig, MFD_CONFIG_FILE } from '../config'
+import {
+  readMfdConfig,
+  defineConfig,
+  resolveLocalized,
+  isLocalized,
+  MFD_CONFIG_FILE,
+} from '../config'
 
 function makeProject(files: Record<string, string>): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mfd-config-'))
@@ -112,6 +118,103 @@ export default {
 `,
     })
     await expect(readMfdConfig(dir)).rejects.toThrow(/style module not found/)
+  })
+
+  it('accepts localized title/description and resolves distEntry', async () => {
+    const dir = project({
+      'dist.addon': 'payload',
+      [MFD_CONFIG_FILE]: `export default {
+  title: { zh: '标题', en: 'Title' },
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: { zh: '# 中文', en: '# English' },
+  distEntry: './dist.addon',
+}
+`,
+    })
+    const config = await readMfdConfig(dir)
+    expect(config.title).toEqual({ zh: '标题', en: 'Title' })
+    expect(config.description).toEqual({ zh: '# 中文', en: '# English' })
+    expect(config.distEntry).toBe(path.resolve(dir, 'dist.addon'))
+    expect(config.i18n).toBeNull()
+  })
+
+  it('throws when distEntry does not exist', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  distEntry: './nope.addon',
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/distEntry not found/)
+  })
+
+  it('validates the i18n record', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  i18n: { download: { zh: '下载', en: 'Download' } },
+}
+`,
+    })
+    const config = await readMfdConfig(dir)
+    expect(config.i18n).toEqual({
+      download: { zh: '下载', en: 'Download' },
+    })
+  })
+
+  it('throws on an invalid i18n value', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: 'md',
+  i18n: { download: 123 },
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/i18n\.download/)
+  })
+
+  it('throws on a non-localized description', async () => {
+    const dir = project({
+      [MFD_CONFIG_FILE]: `export default {
+  mcVersion: { min: '1.0.0', max: '2.0.0' },
+  description: { zh: 123 },
+}
+`,
+    })
+    await expect(readMfdConfig(dir)).rejects.toThrow(/description must be/)
+  })
+})
+
+describe('resolveLocalized', () => {
+  it('passes plain strings through', () => {
+    expect(resolveLocalized('hello', 'en')).toBe('hello')
+    expect(resolveLocalized('hello', 'zh')).toBe('hello')
+  })
+
+  it('picks the requested locale', () => {
+    expect(resolveLocalized({ zh: '中', en: 'En' }, 'zh')).toBe('中')
+    expect(resolveLocalized({ zh: '中', en: 'En' }, 'en')).toBe('En')
+  })
+
+  it('falls back to the other locale when one is missing', () => {
+    expect(resolveLocalized({ zh: '中' }, 'en')).toBe('中')
+    expect(resolveLocalized({ en: 'En' }, 'zh')).toBe('En')
+    expect(resolveLocalized({}, 'en')).toBe('')
+  })
+})
+
+describe('isLocalized', () => {
+  it('accepts strings and { zh, en } objects', () => {
+    expect(isLocalized('x')).toBe(true)
+    expect(isLocalized({ zh: 'x' })).toBe(true)
+    expect(isLocalized({ en: 'x' })).toBe(true)
+    expect(isLocalized(123)).toBe(false)
+    expect(isLocalized({ zh: 123 })).toBe(false)
+    expect(isLocalized(null)).toBe(false)
   })
 })
 

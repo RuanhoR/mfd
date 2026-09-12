@@ -5,7 +5,7 @@ Minecraft 基岩版模组下载站点 & 命令行工具。
 `mfd` 为你的模组提供一个预渲染（类 vitepress SSG）的下载页面：markdown 格式的
 模组介绍、基于与 `mbler build` 相同 SAPI 逻辑（`mcVersion` ->
 `@minecraft/server`）的 Minecraft 版本选择器，以及 `.addon` 文件下载链接。
-前端支持深色模式和英文/中文国际化。
+前端支持深色模式，界面语言（en/zh）自动跟随系统语言。
 
 ## 安装
 
@@ -58,18 +58,25 @@ mfd help      显示帮助
 从 `process.cwd()` 读取，通过 `pathToFileURL` 动态 `import()` 加载，Windows 与
 POSIX 路径行为一致。
 
-| 字段                  | 类型                           | 必填 | 默认值                 | 说明                                  |
-| --------------------- | ------------------------------ | ---- | ---------------------- | ------------------------------------- |
-| `mcVersion`           | `{ min: string, max: string }` | 是   | -                      | 支持的 Minecraft 版本范围              |
-| `description`         | `string`（markdown）           | 是   | -                      | 页面渲染的模组介绍                     |
-| `entryAddonManifest`  | `string`                       | 否   | `/manifest.addon.json` | 提供 manifest 的 api 路径              |
-| `entryDistAddon`      | `string`                       | 否   | `/dist.addon`          | 提供 `.addon` 文件（下载）的 api 路径  |
-| `style`               | `string`                       | 否   | -                      | TS 样式模块路径（见下文）              |
+展示性字符串可以是普通 `string`（各语言相同），也可以是按界面语言取值的
+`{ zh: string, en: string }`。
+
+| 字段                  | 类型                                      | 必填 | 默认值                 | 说明                                  |
+| --------------------- | ----------------------------------------- | ---- | ---------------------- | ------------------------------------- |
+| `title`               | `string \| { zh, en }`                    | 否   | -                      | 页面/模组标题（页头 + 文档标题）       |
+| `mcVersion`           | `{ min: string, max: string }`             | 是   | -                      | 支持的 Minecraft 版本范围              |
+| `description`         | `string \| { zh, en }`（markdown）         | 是   | -                      | 页面渲染的模组介绍                     |
+| `entryAddonManifest`  | `string`                                  | 否   | `/manifest.addon.json` | 提供 manifest 的 api 路径              |
+| `entryDistAddon`      | `string`                                  | 否   | `/dist.addon`          | 提供模组文件（下载）的 api 路径        |
+| `distEntry`           | `string`                                  | 否   | `dist.addon`           | 构建产物文件路径（`.addon`/`.mcaddon`）；命令行 `--addon` 可覆盖 |
+| `i18n`                | `Record<string, string \| { zh, en }>`     | 否   | -                      | 按消息 key 覆盖内置界面文案           |
+| `style`               | `string`                                  | 否   | -                      | TS 样式模块路径（见下文）              |
 
 manifest api（`manifest.addon.json`）由配置生成，格式如下：
 
 ```json
 {
+  "title": { "zh": "我的模组", "en": "My Addon" },
   "description": "# markdown...",
   "distAddon": "/dist.addon",
   "mcVersion": { "min": "1.21.0", "max": "1.21.90" }
@@ -87,9 +94,9 @@ manifest api（`manifest.addon.json`）由配置生成，格式如下：
 
 ## 自定义样式模块
 
-设置 `style: './mfd.style.ts'` 即可自定义页面主题与行为。TS 模块会用 rolldown
-打包、在 `/mfd.style.js` 提供，页面挂载前加载。用 `@mbler/mfd/style` 导出的
-`defineStyle` 可以获得 IDE 提示：
+设置 `style: './mfd.style.ts'` 即可自定义页面，方式类似 vitepress。TS 模块会用
+rolldown 打包、在 `/mfd.style.js` 提供，页面挂载前加载。用 `@mbler/mfd/style`
+导出的 `defineStyle` 可以获得 IDE 提示：
 
 ```ts
 import type { MfdStyleApi } from '@mbler/mfd/style'
@@ -101,15 +108,29 @@ export default (api: MfdStyleApi): void => {
   api.onManifest((m) => console.log(m.mcVersion))
   api.onThemeChange((mode) => console.log(mode))
   api.onLocaleChange((locale) => console.log(locale))
-  // 完全接管：用自己的组件替换默认页面
-  // api.replaceRoot(api.vue.defineComponent({ ... }))
+  // 完全接管：提供自己的 layout 组件（会收到 api 作为 prop），
+  // 并用暴露好的页面构件自由组合
+  // api.setLayout(api.vue.defineComponent({ ... }))
 }
 ```
 
+也可以直接从模块导出 `layout` 组件：
+
+```ts
+import { defineStyle } from '@mbler/mfd/style'
+
+export default defineStyle({
+  theme: { accent: '#8b5cf6' },
+  // 类 vitepress 自定义 layout；现成构件在 api.components 上
+  layout: (props) => props.api.vue.h('div', 'my page'),
+})
+```
+
 API（`MfdStyleApi`）：`root`、`vue`（vue 运行时导出，无需 import vue）、
-`manifest`、`theme`、`locale`、`setThemeVars`、`setTheme`、`onThemeChange`、
-`setLocale`、`onLocaleChange`、`onManifest`、`setTitle`、`replaceRoot`、
-`registerComponent`。
+`components`（现成页面构件：`AddonIntro`、`AddonVersions`）、`manifest`、
+`theme`、`locale`、`t`、`setThemeVars`、`setTheme`、`onThemeChange`、
+`setLocale`、`onLocaleChange`、`onManifest`、`setTitle`、`setLayout` /
+`replaceRoot`、`registerComponent`。
 
 ## 开发
 

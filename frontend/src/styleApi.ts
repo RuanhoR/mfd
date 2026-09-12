@@ -2,8 +2,9 @@ import * as vueRuntime from 'vue'
 import type { Component } from 'vue'
 import { entryStyle } from './api'
 import { theme, setTheme } from './theme'
-import { locale, setLocale } from './i18n'
+import { locale, setLocale, t as translate } from './i18n'
 import { themeBus, localeBus, manifestBus } from './events'
+import * as components from './components'
 import type {
   MfdStyleApi,
   MfdStyleModule,
@@ -12,8 +13,8 @@ import type {
 
 export interface StyleApiHandle {
   api: MfdStyleApi
-  /** root component set via replaceRoot, used at mount time */
-  customRoot: Component | null
+  /** layout component set via setLayout/replaceRoot, used at mount time */
+  customLayout: Component | null
   /** global components registered via registerComponent */
   queuedComponents: Array<[string, unknown]>
 }
@@ -24,7 +25,7 @@ export function createStyleApi(
   root: HTMLElement = document.getElementById('app') as HTMLElement
 ): StyleApiHandle {
   const handle: StyleApiHandle = {
-    customRoot: null,
+    customLayout: null,
     queuedComponents: [],
     api: null as unknown as MfdStyleApi,
   }
@@ -32,6 +33,7 @@ export function createStyleApi(
   handle.api = {
     root,
     vue: vueRuntime as unknown as Record<string, unknown>,
+    components: components as unknown as Record<string, unknown>,
     get manifest() {
       return currentManifest
     },
@@ -41,6 +43,7 @@ export function createStyleApi(
     get locale() {
       return locale.value
     },
+    t: translate,
     setThemeVars(vars) {
       const el = document.documentElement
       for (const [key, value] of Object.entries(vars)) {
@@ -65,8 +68,11 @@ export function createStyleApi(
     setTitle(title) {
       document.title = title
     },
+    setLayout(layout) {
+      handle.customLayout = layout as Component
+    },
     replaceRoot(component) {
-      handle.customRoot = component as Component
+      handle.customLayout = component as Component
     },
     registerComponent(name, component) {
       handle.queuedComponents.push([name, component])
@@ -81,6 +87,7 @@ export async function loadCustomStyle(handle: StyleApiHandle): Promise<void> {
   if (!entryStyle) return
   const mod = (await import(/* @vite-ignore */ entryStyle)) as MfdStyleModule
   if (mod.theme) handle.api.setThemeVars(mod.theme)
+  if (mod.layout) handle.api.setLayout(mod.layout)
   const setup = mod.default ?? mod.setup
   if (setup) await setup(handle.api)
 }

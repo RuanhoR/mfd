@@ -4,7 +4,12 @@ import cac, { type CAC } from 'cac'
 import { readMfdConfig } from './config'
 import { startPageServer } from './server'
 
-export { readMfdConfig, defineConfig } from './config'
+export {
+  readMfdConfig,
+  defineConfig,
+  resolveLocalized,
+  isLocalized,
+} from './config'
 export type { MfdConfig, MfdConfigData, MfdMcVersionRange } from './config'
 export {
   defineStyle,
@@ -13,6 +18,7 @@ export {
   type MfdManifest,
   type MfdThemeMode,
   type MfdLocale,
+  type Localized,
 } from './style-types'
 
 function getVersion(): string {
@@ -42,9 +48,7 @@ export function createCliApp(): CAC {
     .command('page', 'Serve the addon downloader website')
     .option('-p, --port <port>', 'Port to listen on', { default: 9527 })
     .option('-H, --host <host>', 'Host to bind', { default: 'localhost' })
-    .option('--addon <file>', 'Path to the .addon file, relative to cwd', {
-      default: 'dist.addon',
-    })
+    .option('--addon <file>', 'Path to the addon file, overrides distEntry in mfd.config.js')
     .option('--root <dir>', 'Custom frontend dist directory')
     .action(async (opts) => {
       try {

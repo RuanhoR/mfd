@@ -63,7 +63,12 @@ async function testInstance(cwd, base, args, endpoints, expectCustom) {
       manifestRes.ok &&
         manifestRes.headers.get('content-type').includes('application/json')
     )
-    check('manifest has description (md)', typeof manifest.description === 'string' && manifest.description.startsWith('#'))
+    const description = manifest.description
+    const descText =
+      typeof description === 'string'
+        ? description
+        : (description?.en ?? description?.zh ?? '')
+    check('manifest has description (md)', descText.startsWith('#'))
     check('manifest has distAddon', typeof manifest.distAddon === 'string')
     check(
       'manifest has mcVersion min/max',
