@@ -37,9 +37,10 @@
     "dev:frontend": "pnpm -C frontend dev",
     "cli": "node bin/mfd.js",
     "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
-    "lint:type-check": "tsc --noEmit",
-    "check": "pnpm lint && pnpm test && pnpm lint:type-check && pnpm -C frontend type-check",
+    "type-check": "tsc --noEmit",
+    "check": "pnpm lint && pnpm test && pnpm type-check && pnpm -C frontend type-check",
     "format": "prettier ./src --write"
   },
   "dependencies": {
