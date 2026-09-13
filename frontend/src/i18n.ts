@@ -22,7 +22,8 @@ const messages: Record<Locale, Record<string, string>> = {
     loadFailed: 'Failed to load the addon manifest',
     retry: 'Retry',
     noVersions: 'No matching Minecraft versions found',
-    footer: 'Powered by @mbler/mfd',
+    footerPrefix: 'Powered by ',
+    footerSuffix: '',
   },
   zh: {
     title: '模组下载',
@@ -43,7 +44,8 @@ const messages: Record<Locale, Record<string, string>> = {
     loadFailed: '模组信息加载失败',
     retry: '重试',
     noVersions: '没有找到匹配的 Minecraft 版本',
-    footer: '由 @mbler/mfd 驱动',
+    footerPrefix: '由 ',
+    footerSuffix: ' 驱动',
   },
 }
 

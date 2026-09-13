@@ -127,6 +127,10 @@ onMounted(() => {
   color: var(--mfd-muted);
   font-size: 0.85rem;
 }
+
+.footer-link {
+  color: inherit;
+}
 </style>
 <template>
   <div class="page">
@@ -156,6 +160,15 @@ onMounted(() => {
       <AddonVersions :manifest="manifest" />
     </main>
 
-    <footer class="footer">{{ t('footer') }}</footer>
+    <footer class="footer">
+      {{ t('footerPrefix')
+      }}<a
+        class="footer-link"
+        href="https://www.npmjs.com/package/@mbler/mfd"
+        target="_blank"
+        rel="noopener"
+        >@mbler/mfd</a
+      >{{ t('footerSuffix') }}
+    </footer>
   </div>
 </template>
