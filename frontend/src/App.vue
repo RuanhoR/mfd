@@ -56,7 +56,78 @@ onMounted(() => {
   }
 })
 </script>
+<style lang="css" scoped>
+.icon {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
 
+.page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.page-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--mfd-muted);
+  font-size: 0.9rem;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.controls .btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.detail {
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.footer {
+  margin-top: 32px;
+  text-align: center;
+  color: var(--mfd-muted);
+  font-size: 0.85rem;
+}
+</style>
 <template>
   <div class="page">
     <header class="page-header">
@@ -65,12 +136,9 @@ onMounted(() => {
         <p class="tagline">{{ t('tagline') }}</p>
       </div>
       <div class="controls">
-        <button
-          class="btn ghost"
-          :title="theme === 'dark' ? t('themeToLight') : t('themeToDark')"
-          @click="toggleTheme"
-        >
-          {{ theme === 'dark' ? '☀️' : '🌙' }}
+        <button class="btn ghost" :title="theme === 'dark' ? t('themeToLight') : t('themeToDark')" @click="toggleTheme">
+          <img class="icon" v-if="theme == 'dark'" src="./assets/moon.svg">
+          <img class="icon" v-if="theme == 'light'" src="./assets/sun.svg">
         </button>
       </div>
     </header>

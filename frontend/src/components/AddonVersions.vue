@@ -143,3 +143,55 @@ onMounted(loadVersions)
     <p v-else class="state">{{ t('noVersions') }}</p>
   </section>
 </template>
+
+<style scoped>
+.range {
+  color: var(--mfd-muted);
+  margin: 0 0 16px;
+}
+
+.range strong {
+  color: var(--mfd-fg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  max-width: 320px;
+}
+
+select {
+  background: var(--mfd-bg);
+  color: var(--mfd-fg);
+  border: 1px solid var(--mfd-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+}
+
+.mapped {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.mapped dt {
+  color: var(--mfd-muted);
+  font-size: 0.85rem;
+}
+
+.mapped dd {
+  margin: 2px 0 0;
+}
+
+.btn.primary {
+  background: var(--mfd-accent);
+  color: var(--mfd-accent-fg);
+  border-color: transparent;
+  padding: 10px 24px;
+  font-weight: 600;
+}
+</style>

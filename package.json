@@ -69,6 +69,7 @@
     "bin",
     "frontend",
     "!frontend/dist",
+    "!frontend/node_modules",
     "README.md",
     "LICENSE"
   ],
