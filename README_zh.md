@@ -162,6 +162,14 @@ API（`MfdStyleApi`）：`root`、`vue`（vue 运行时导出，无需 import vu
 `setLocale`、`onLocaleChange`、`onManifest`、`setTitle`、`setLayout` /
 `replaceRoot`、`registerComponent`。
 
+## 示例
+
+- **线上演示**：<https://addon.wei.qzz.io/> —— 用 `mfd page` 构建并部署的
+  真实下载站，聚合了多个模组页面
+  （如 <https://addon.wei.qzz.io/bed-wars/>）
+- 仓库内的 [`example/`](./example) 项目：进入该目录执行
+  `node bin/mfd.js page`，即可体验带自定义端点和样式模块的构建。
+
 ## 开发
 
 ```sh

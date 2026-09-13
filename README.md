@@ -173,6 +173,15 @@ The API surface (`MfdStyleApi`): `root`, `vue` (live vue runtime exports, no
 `setTheme`, `onThemeChange`, `setLocale`, `onLocaleChange`, `onManifest`,
 `setTitle`, `setLayout` / `replaceRoot`, `registerComponent`.
 
+## Example
+
+- **Live demo**: <https://addon.wei.qzz.io/> — a real hub built and
+  deployed with `mfd page`, listing several addons
+  (e.g. <https://addon.wei.qzz.io/bed-wars/>)
+- This repository ships the [`example/`](./example) project: run
+  `node bin/mfd.js page` inside it to try a build with custom api
+  endpoints and a style module.
+
 ## Development
 
 ```sh
