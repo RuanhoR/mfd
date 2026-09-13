@@ -177,11 +177,10 @@ The API surface (`MfdStyleApi`): `root`, `vue` (live vue runtime exports, no
 
 ```sh
 pnpm install          # frontend is part of the pnpm workspace
-pnpm build            # frontend (rolldown-vite client + ssr + prerender) then cli (rolldown)
+pnpm build            # frontend (vite client + ssr) then cli (rolldown)
 pnpm dev:frontend     # vite dev server, uses frontend/public/manifest.addon.json demo
 pnpm check            # eslint + vitest + tsc --noEmit + frontend vue-tsc
-pnpm test             # vitest unit tests (config loader, sapi mapping)
-node scripts/smoke.mjs # smoke tests: serves example/ and a temp config, checks endpoints
+pnpm test             # vitest: unit tests (config/sapi/zip patch) + cli e2e (page build & serve)
 node bin/mfd.js page  # run the cli from source builds
 ```
 

@@ -166,11 +166,10 @@ API（`MfdStyleApi`）：`root`、`vue`（vue 运行时导出，无需 import vu
 
 ```sh
 pnpm install          # frontend 是上层 pnpm workspace 的一部分
-pnpm build            # 先 frontend（rolldown-vite client + ssr + prerender），再 cli（rolldown）
+pnpm build            # 先 frontend（vite client + ssr），再 cli（rolldown）
 pnpm dev:frontend     # vite 开发服务器，使用 frontend/public/manifest.addon.json 演示数据
 pnpm check            # eslint + vitest + tsc --noEmit + frontend vue-tsc
-pnpm test             # vitest 单元测试（配置加载、sapi 映射）
-node scripts/smoke.mjs # smoke 测试：启动 example/ 与临时配置服务，检查各端点
+pnpm test             # vitest：单元测试（配置/sapi/zip 改写）+ cli e2e（page 构建 & serve）
 node bin/mfd.js page  # 从构建产物直接运行 cli
 ```
 
