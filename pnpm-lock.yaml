@@ -17,6 +17,9 @@ importers:
       cac:
         specifier: ^6.7.14
         version: 6.7.14
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.3
       marked:
         specifier: ^16.0.0
         version: 16.4.2
@@ -42,9 +45,6 @@ importers:
       eslint:
         specifier: 10.4.0
         version: 10.4.0
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.3
       globals:
         specifier: 17.0.0
         version: 17.0.0
