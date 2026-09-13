@@ -1,6 +1,6 @@
 {
   "name": "@mbler/mfd",
-  "version": "0.0.1-alpha",
+  "version": "0.0.1-alpha.1",
   "description": "Minecraft addon downloader website & cli (mfd)",
   "repository": {
     "type": "git",
